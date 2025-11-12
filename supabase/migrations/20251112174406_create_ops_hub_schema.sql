@@ -93,6 +93,12 @@ CREATE POLICY "Authenticated users can update participants"
   USING (true)
   WITH CHECK (true);
 
+CREATE POLICY "Anon can manage participants"
+  ON participants FOR ALL
+  TO anon
+  USING (true)
+  WITH CHECK (true);
+
 -- Create travel_approvals table
 CREATE TABLE IF NOT EXISTS travel_approvals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,6 +133,12 @@ CREATE POLICY "Authenticated users can update travel approvals"
   USING (true)
   WITH CHECK (true);
 
+CREATE POLICY "Anon can manage travel approvals"
+  ON travel_approvals FOR ALL
+  TO anon
+  USING (true)
+  WITH CHECK (true);
+
 -- Create check_ins table
 CREATE TABLE IF NOT EXISTS check_ins (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -148,6 +160,11 @@ CREATE POLICY "Anyone can view check-ins"
 CREATE POLICY "Authenticated users can insert check-ins"
   ON check_ins FOR INSERT
   TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Anon can insert check-ins"
+  ON check_ins FOR INSERT
+  TO anon
   WITH CHECK (true);
 
 -- Create payouts table
@@ -183,6 +200,12 @@ CREATE POLICY "Authenticated users can update payouts"
   USING (true)
   WITH CHECK (true);
 
+CREATE POLICY "Anon can manage payouts"
+  ON payouts FOR ALL
+  TO anon
+  USING (true)
+  WITH CHECK (true);
+
 -- Create activity_log table
 CREATE TABLE IF NOT EXISTS activity_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -207,6 +230,11 @@ CREATE POLICY "Authenticated users can insert activity log"
   TO authenticated
   WITH CHECK (true);
 
+CREATE POLICY "Anon can insert activity log"
+  ON activity_log FOR INSERT
+  TO anon
+  WITH CHECK (true);
+
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_travel_approvals_participant ON travel_approvals(participant_id);
 CREATE INDEX IF NOT EXISTS idx_travel_approvals_status ON travel_approvals(status);
@@ -214,3 +242,4 @@ CREATE INDEX IF NOT EXISTS idx_check_ins_approval ON check_ins(travel_approval_i
 CREATE INDEX IF NOT EXISTS idx_payouts_approval ON payouts(travel_approval_id);
 CREATE INDEX IF NOT EXISTS idx_activity_log_participant ON activity_log(participant_id);
 CREATE INDEX IF NOT EXISTS idx_activity_log_created ON activity_log(created_at DESC);
+
