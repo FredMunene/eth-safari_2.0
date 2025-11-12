@@ -12,6 +12,7 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(false);
   const [qrPreview, setQrPreview] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     participantId: '',
     participantName: '',
@@ -39,6 +40,7 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
 
     try {
       let participantId = formData.participantId;
@@ -87,7 +89,12 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
       onSuccess();
     } catch (error) {
       console.error('Error creating approval:', error);
-      alert('Failed to create approval. Please try again.');
+      const supabaseError = error as { code?: string; message?: string };
+      if (supabaseError?.code === '23505') {
+        setErrorMessage('A participant with this email already exists. Uncheck "New Participant" and pick them from the dropdown.');
+      } else {
+        setErrorMessage('Failed to create approval. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -120,6 +127,11 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
+          {errorMessage && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {errorMessage}
+            </div>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
               <div>
