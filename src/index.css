@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sand-50: #faf9f7;
+  --sand-100: #f5f2ed;
+  --sand-200: #e8e3d9;
+  --sand-300: #d8d1c4;
+  --sand-400: #c5bbab;
+  --sand-500: #a99d8b;
+  --sand-600: #8d8171;
+  --sand-700: #6d655a;
+  --sand-800: #534e47;
+  --sand-900: #3d3a36;
+
+  --sage-50: #f6f8f6;
+  --sage-100: #e8ede8;
+  --sage-200: #d0dbd0;
+  --sage-300: #afc2af;
+  --sage-400: #8aa88a;
+  --sage-500: #6b8e6b;
+  --sage-600: #547254;
+  --sage-700: #435a43;
+  --sage-800: #364836;
+  --sage-900: #2d3c2d;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--sand-50);
+}
+
+@layer utilities {
+  .bg-sage-600 {
+    background-color: var(--sage-600);
+  }
+  .bg-sage-700 {
+    background-color: var(--sage-700);
+  }
+  .hover\:bg-sage-700:hover {
+    background-color: var(--sage-700);
+  }
+}
