@@ -88,3 +88,20 @@
 **Notes / Lessons Learned:**  
 - Manual QR entry can reuse the same proxy path; no extra Supabase reads are needed in the browser.  
 - Once payouts shift to the proxy we can confidently lock RLS to service-role only.  
+
+## [2025-11-13] Issue-ID: payouts-proxy-integration
+**Context:**  
+- Finance console needed to route payout completion through the ops proxy before RLS tightening.  
+
+**Error / Symptom:**  
+- None observed yet, but anon writes would have been blocked once policies change.  
+
+**Root Cause:**  
+- `PayoutConsole` updated `payouts` and `activity_log` directly with the anon key.  
+
+**Fix / Change:**  
+- Added a `complete_payout` action inside the ops proxy plus `completePayoutRequest` client helper; `PayoutConsole` now fetches a Privy access token and submits completion events via the proxy.  
+
+**Notes / Lessons Learned:**  
+- Provide better inline error UI than `alert` so finance can see why an update failed.  
+- With payouts migrated, only residual anon mutations remain in areas like future Aqua attestations.  

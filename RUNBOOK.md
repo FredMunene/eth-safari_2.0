@@ -118,3 +118,21 @@
 **Follow-Up:**  
 - Document the incident in `DEBUG.md` including root cause.  
 - If the proxy logic needs schema or threat-model updates, capture them in `ADR.md` / `THREAT_MODEL.md`.  
+
+### 3.5 “Payout Console Cannot Mark Payouts Completed”
+**Symptoms:**  
+- Finance console shows “Failed to process payout” toast; status stays `pending`.  
+
+**Quick Checks:**  
+- Inspect browser network panel for the `/ops-proxy` request; confirm `Authorization` header is present and the response body contains details.  
+- Call the health endpoint (`GET /ops-proxy`) to ensure the Edge Function is live.  
+- Verify the payout row exists in Supabase (`payouts` table) and hasn’t already been marked `completed`.  
+
+**Mitigation:**  
+- If the proxy returns `Payout not found`, refresh the table (stale UI) or recreate the payout record.  
+- For validation errors (missing proof), re-open the modal and ensure proof type/data fields are filled.  
+- If the proxy throws 401, re-authenticate via Privy to mint a fresh access token.  
+
+**Follow-Up:**  
+- Add a `DEBUG.md` entry describing the failure.  
+- If root cause was a schema or ops change, update `ADR.md` / `THREAT_MODEL.md` accordingly.  
