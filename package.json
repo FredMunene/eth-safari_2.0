@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@privy-io/react-auth": "^1.84.1",
+    "@privy-io/server-auth": "^1.32.5",
     "@supabase/supabase-js": "^2.81.1",
     "@zxing/library": "^0.21.3",
     "lucide-react": "^0.553.0",
