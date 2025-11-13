@@ -4,6 +4,7 @@
 - **Ops Hub Web App (Vite + React):** Provides Ops Lead panel, participant portal, QR scanner, payout console. Reads directly via anon key but routes privileged mutations through the `ops-proxy` Supabase Edge Function using Privy access tokens.  
 - **Supabase Postgres:** Hosts tables defined in `supabase/migrations/20251112174406_create_ops_hub_schema.sql` plus RLS policies for participants, travel approvals, check-ins, payouts, and activity log.  
 - **Aqua Attestation Hooks:** Ops proxy now mints Aqua attestations (via `aqua-js-sdk`) for approvals, check-ins, and payouts, writing hashes to the respective tables and flipping `aqua_verified` on activity logs.  
+- **Participant Onboarding Portal:** `/apply` route where invitees authenticate with Privy, fetch their `onboarding_invites` row, and submit travel/stipend details that create pending `travel_approvals`.  
 
 ## 2. Routine Procedures
 
@@ -43,6 +44,12 @@
    ```  
 4. Verify health by calling `GET https://<project>.functions.supabase.co/ops-proxy` (should return `{status:"ok"}`).  
 5. Roll back by redeploying the previous commit or using `supabase functions deploy ops-proxy --import-map <old>` if needed.  
+
+### 2.6 Managing Onboarding Invites
+1. Ops app → `Invites` button opens the modal backed by Supabase reads.  
+2. Create invite via proxy (`create_onboarding_invite` action). Copy the generated token and share it with the participant.  
+3. Participants visit `/apply?token=<token>`, sign in with Privy, and submit their form (proxy action `submit_onboarding`).  
+4. Review submissions as pending travel approvals inside the main dashboard.  
 
 ## 3. Incident Playbooks
 
@@ -136,3 +143,21 @@
 **Follow-Up:**  
 - Add a `DEBUG.md` entry describing the failure.  
 - If root cause was a schema or ops change, update `ADR.md` / `THREAT_MODEL.md` accordingly.  
+
+### 3.6 “Participant Portal Invite Issues”
+**Symptoms:**  
+- Participant can’t load their token on `/apply`, sees “Invite not found” or submission fails.  
+
+**Quick Checks:**  
+- Confirm the token exists in `onboarding_invites` and status is `pending`.  
+- Verify the participant is authenticated via Privy (look for `/ops-proxy` 401/403).  
+- Review proxy logs for `submit_onboarding` errors (missing itinerary, stipend parse, etc.).  
+
+**Mitigation:**  
+- Re-issue a fresh invite via the ops modal and share the new token.  
+- If the invite was accidentally marked `submitted`, set status back to `pending` via SQL and clear `travel_approval_id`.  
+- Coach the participant to refresh and resubmit once Privy session is active.  
+
+**Follow-Up:**  
+- Document root cause in `DEBUG.md`.  
+- Add tests or validation if specific fields (itinerary, stipend) were causing proxy errors.  

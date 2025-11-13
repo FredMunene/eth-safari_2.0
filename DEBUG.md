@@ -138,3 +138,20 @@
 
 **Notes / Lessons Learned:**  
 - After applying the migration, frontends must rely on the proxy; monitor for any lingering direct writes before enabling.  
+
+## [2025-11-13] Issue-ID: participant-onboarding
+**Context:**  
+- Implemented the invite → `/apply` submission flow (Milestone M2) on top of Privy + the ops proxy.  
+
+**Error / Symptom:**  
+- Previously there was no safe way for participants to submit data; ops had to create approvals manually.  
+
+**Root Cause:**  
+- Missing storage (`onboarding_invites`) and proxy handlers to authenticate tokens + create pending approvals.  
+
+**Fix / Change:**  
+- Added `onboarding_invites` table, new proxy actions (`create_onboarding_invite`, `submit_onboarding`), Ops-side Invite Manager modal, and a `/apply` portal that requires Privy auth before posting to the proxy.  
+
+**Notes / Lessons Learned:**  
+- Keep invite tokens short-lived; threat model now tracks leakage risk.  
+- The `/apply` route shares the same SPA bundle, so remember to configure host rewrites.  

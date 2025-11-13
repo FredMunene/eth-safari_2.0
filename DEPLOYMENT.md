@@ -41,6 +41,7 @@ Not applicable yet. Aqua attestations are handled off-chain through the JS SDK; 
    ```  
 5. Deploy the `dist/` folder to your static host (Vercel, Netlify, Cloudflare Pages, etc.) and supply the two env vars above.  
 6. Deploy the service-role proxy / Supabase Edge Function with `SUPABASE_SERVICE_ROLE_KEY`, `PRIVY_APP_SECRET`, and any Aqua credentials; ensure its endpoint is reachable from the frontend.  
+7. Configure your host to serve the SPA fallback so `/apply` routes to `index.html`; the participant portal shares the same bundle.  
 
 ## 7. Ops Proxy (Supabase Edge Function)
 - Deploy from the repo root once Supabase CLI is linked:  
@@ -67,6 +68,7 @@ Not applicable yet. Aqua attestations are handled off-chain through the JS SDK; 
   ```  
 - (Optional) Seed participants manually via Supabase dashboard or by inserting rows through the Travel Approval form once the UI is running.  
 - Apply the latest RLS hardening migration (`20251113140000_tighten_rls.sql`) so anon clients remain read-only while the service-role proxy handles mutations.  
+- Apply the onboarding invite schema (`20251113152000_create_onboarding_invites.sql`) to enable the `/apply` participant portal.  
 
 ## 6. Common Deployment Pitfalls
 - **Missing env vars:** The app throws `Missing Supabase environment variables` during start/build if either `VITE_SUPABASE_URL` or `VITE_SUPABASE_SUPABASE_ANON_KEY` is absent. Double-check host-level config.  

@@ -11,9 +11,9 @@
 ## M2: Participant Onboarding Flow
 **Goal:** deliver the invite → self-submission → ops review path with end-to-end data persistence.  
 **Checklist:**
-- [ ] Implement invite token handling plus wallet/magic-link auth stubs in the frontend.
-- [ ] Build the participant submission form with draft/submit/cancel states wired to Supabase.
-- [ ] Document new flows in `RUNBOOK.md` (ops steps) and `THREAT_MODEL.md` (auth + attestation risks).
+- [x] Implement invite token handling plus wallet/magic-link auth stubs in the frontend.
+- [x] Build the participant submission form with draft/submit/cancel states wired to Supabase.
+- [x] Document new flows in `RUNBOOK.md` (ops steps) and `THREAT_MODEL.md` (auth + attestation risks).
 
 ## M3: Ops Lead Panel & Timeline
 **Goal:** create the ops dashboard with metrics, participant table, and per-user timelines backed by live data.  

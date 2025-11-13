@@ -59,3 +59,31 @@
 - **Related:**  
 - Code: `src/main.tsx`, `src/components/AuthGate.tsx`, `supabase/functions/ops-proxy/index.ts`  
 - Threats: `THREAT_MODEL.md` entries for Privy dependency, proxy compromise, token replay.  
+
+## ADR-003: Participant Onboarding Portal
+**Status:** Accepted  
+**Date:** 2025-11-13  
+
+**Context:**  
+- Ops needed a way to issue invite tokens and let travelers submit itineraries/stipend requests without granting anon writes.  
+- Participants should authenticate with Privy (wallet/email) and reuse the same Supabase backend without introducing a second service.  
+- Invite lifecycle must feed the existing `travel_approvals` table so Ops can review pending submissions.  
+
+**Decision:**  
+- Store invites in a dedicated `onboarding_invites` table with RLS read-only policies; write access flows through the ops proxy.  
+- Ops side uses a Privy-gated modal to create invites via the proxy, which logs the action in `activity_log`.  
+- Participants visit `/apply`, authenticate with Privy, load their invite token (read via anon select), and submit the onboarding form; the proxy validates the token, creates/links participants and pending travel approvals, and records the submission event.  
+- Aqua attestations are minted for onboarding submissions so the resulting travel approvals share the same trust guarantees.  
+
+**Alternatives Considered:**  
+- **Direct Supabase writes from the `/apply` page** — rejected due to tightened RLS and lack of Privy verification.  
+- **Separate backend service for onboarding** — more surface area to operate; reusing the ops proxy keeps auth + Aqua integration centralized.  
+
+**Consequences:**  
+- Positive: external participants and internal ops share the same Privy login + proxy infrastructure.  
+- Positive: invites provide a simple rollback path (status tracking via `onboarding_invites`).  
+- Negative: more proxy actions to maintain/test; invite tokens become a sensitive asset (tracked in the threat model).  
+
+**Related:**  
+- Code: `supabase/migrations/20251113152000_create_onboarding_invites.sql`, `supabase/functions/ops-proxy/index.ts`, `src/components/InviteManager.tsx`, `src/components/OnboardingPortal.tsx`.  
+- Threats: `THREAT_MODEL.md` entries for invite token leakage.  

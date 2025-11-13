@@ -87,6 +87,20 @@
 
 **Status:** Open.  
 
+### T-006: Invite Token Leakage
+**Description:**  
+- Onboarding tokens grant access to personal submission forms; leaking them lets an attacker impersonate a participant during submission.  
+
+**Impact:** Medium — bogus submissions could block legitimate travel approvals or leak PII.  
+**Likelihood:** Medium — tokens may be shared over email/DM and can be copied in the ops UI.  
+
+**Mitigation:**  
+- Treat tokens as secrets: display them only once after creation, encourage ops to rotate if shared in insecure channels.  
+- Optionally expire tokens after first submission or after a time window.  
+- Monitor invite status changes and log unexpected submissions in `activity_log`.  
+
+**Status:** Open.  
+
 ## 4. Known Limitations
 - No dedicated auth tier; everything flows through the anon key which can be leaked.  
 - No rate limiting or anomaly detection around QR scans or payouts.  
