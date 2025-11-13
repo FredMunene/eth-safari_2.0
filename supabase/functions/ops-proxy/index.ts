@@ -3,11 +3,13 @@ import { corsHeaders } from 'https://esm.sh/@supabase/functions-js@2.4.1/dist/co
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import { PrivyClient } from 'https://esm.sh/@privy-io/server-auth@1.32.5?target=deno';
 import { z } from 'https://esm.sh/zod@3.23.8';
+import Aquafier from 'npm:aqua-js-sdk';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const privyAppId = Deno.env.get('PRIVY_APP_ID');
 const privyAppSecret = Deno.env.get('PRIVY_APP_SECRET');
+const aquaEnabled = Deno.env.get('AQUA_ENABLED') !== 'false';
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
   throw new Error('Missing Supabase service-role configuration for ops proxy');
@@ -25,6 +27,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
 });
 
 const privy = new PrivyClient(privyAppId, privyAppSecret);
+const aquafier = aquaEnabled ? new Aquafier() : null;
 
 const issueApprovalSchema = z.object({
   participant: z.object({
@@ -118,6 +121,35 @@ async function ensureParticipant(participant: IssueApprovalInput['participant'])
   return data.id as string;
 }
 
+type AttestationResult = {
+  hash: string | null;
+};
+
+async function createAquaAttestation(kind: string, payload: Record<string, unknown>): Promise<AttestationResult | null> {
+  if (!aquaEnabled || !aquafier) {
+    return null;
+  }
+  try {
+    const fileObject = {
+      fileName: `${kind}-${crypto.randomUUID()}.json`,
+      fileContent: JSON.stringify({ ...payload, kind, timestamp: new Date().toISOString() }),
+    };
+    const result = await aquafier.createGenesisRevision(fileObject);
+    if (result?.tag === 'ok') {
+      const hash =
+        result.data?.aquaTree?.tree?.hash ??
+        result.data?.aquaTree?.treeMapping?.latestHash ??
+        null;
+      return { hash };
+    }
+    console.error('Aqua attestation failed', result);
+    return null;
+  } catch (error) {
+    console.error('Aqua attestation error', error);
+    return null;
+  }
+}
+
 async function issueTravelApproval(payload: IssueApprovalInput, operatorId: string) {
   const participantId = await ensureParticipant(payload.participant);
   const qrToken = crypto.randomUUID();
@@ -140,6 +172,21 @@ async function issueTravelApproval(payload: IssueApprovalInput, operatorId: stri
     throw new Error(`Failed to create travel approval: ${approvalError?.message ?? 'unknown error'}`);
   }
 
+  const attestation = await createAquaAttestation('travel_approval', {
+    approvalId: approval.id,
+    participantId,
+    stipendAmount: payload.stipendAmount,
+    status: payload.status,
+    operator_privy_user: operatorId,
+  });
+
+  if (attestation?.hash) {
+    await supabase
+      .from('travel_approvals')
+      .update({ aqua_attestation_hash: attestation.hash })
+      .eq('id', approval.id);
+  }
+
   await supabase.from('activity_log').insert({
     event_type: 'approval',
     participant_id: participantId,
@@ -148,8 +195,9 @@ async function issueTravelApproval(payload: IssueApprovalInput, operatorId: stri
       approval_id: approval.id,
       stipend_amount: payload.stipendAmount,
       operator_privy_user: operatorId,
+      aqua_hash: attestation?.hash ?? null,
     },
-    aqua_verified: false,
+    aqua_verified: Boolean(attestation?.hash),
   });
 
   return { approval };
@@ -170,14 +218,33 @@ async function recordCheckIn(payload: RecordCheckInInput, operatorId: string) {
     throw new Error('Travel approval is not in approved status');
   }
 
-  const { error: insertError } = await supabase.from('check_ins').insert({
-    travel_approval_id: approval.id,
+  const { data: checkIn, error: insertError } = await supabase
+    .from('check_ins')
+    .insert({
+      travel_approval_id: approval.id,
+      location: payload.location,
+      timestamp: new Date().toISOString(),
+    })
+    .select('*')
+    .single();
+
+  if (insertError || !checkIn) {
+    throw new Error(insertError.message);
+  }
+
+  const attestation = await createAquaAttestation('check_in', {
+    travelApprovalId: approval.id,
+    participantId: approval.participant_id,
     location: payload.location,
-    timestamp: new Date().toISOString(),
+    operator_privy_user: operatorId,
+    checkInId: checkIn.id,
   });
 
-  if (insertError) {
-    throw new Error(insertError.message);
+  if (attestation?.hash) {
+    await supabase
+      .from('check_ins')
+      .update({ aqua_attestation_hash: attestation.hash })
+      .eq('id', checkIn.id);
   }
 
   await supabase.from('activity_log').insert({
@@ -188,12 +255,14 @@ async function recordCheckIn(payload: RecordCheckInInput, operatorId: string) {
       approval_id: approval.id,
       location: payload.location,
       operator_privy_user: operatorId,
+      aqua_hash: attestation?.hash ?? null,
     },
-    aqua_verified: false,
+    aqua_verified: Boolean(attestation?.hash),
   });
 
   return {
     participant: approval.participants,
+    aqua_hash: attestation?.hash ?? null,
   };
 }
 
@@ -222,6 +291,21 @@ async function completePayout(payload: CompletePayoutInput, operatorId: string) 
     throw new Error(updateError.message);
   }
 
+  const attestation = await createAquaAttestation('payout', {
+    payoutId: payout.id,
+    travelApprovalId: payout.travel_approval_id,
+    amount: payout.amount,
+    status: payload.status,
+    operator_privy_user: operatorId,
+  });
+
+  if (attestation?.hash) {
+    await supabase
+      .from('payouts')
+      .update({ aqua_attestation_hash: attestation.hash })
+      .eq('id', payout.id);
+  }
+
   await supabase.from('activity_log').insert({
     event_type: 'payout',
     participant_id: payout.travel_approvals?.participant_id ?? null,
@@ -230,8 +314,9 @@ async function completePayout(payload: CompletePayoutInput, operatorId: string) 
       payout_id: payout.id,
       proof_type: payload.proofType,
       operator_privy_user: operatorId,
+      aqua_hash: attestation?.hash ?? null,
     },
-    aqua_verified: false,
+    aqua_verified: Boolean(attestation?.hash),
   });
 
   return { payoutId: payout.id, status: payload.status };
