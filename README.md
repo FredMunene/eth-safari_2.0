@@ -1,73 +1,62 @@
-# React + TypeScript + Vite
+# ETH Safari 2025 Ops Hub
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**A submission for the [ETH-Safari Hackathon 2025](https://dorahacks.io/hackathon/eth-safari-hackathon-2025/detail).**
 
-Currently, two official plugins are available:
+This project is a web-based "Ops Hub" designed to streamline logistics and participant management for the ETH Safari hackathon. It provides a centralized dashboard for organizers to manage travel approvals, participant check-ins, and stipend disbursements, while offering a clear portal for participants to view their status.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🎯 The Problem We're Solving
 
-## React Compiler
+Large-scale events like hackathons often rely on manual processes and spreadsheets for managing logistics, leading to several pain points:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1.  **Communication Gaps:** Difficulty in broadcasting verified updates (like schedule changes or bounty clarifications) to all participants reliably.
+2.  **Lack of Structured Involvement:** It's hard to track contributions and commitments from volunteers, mentors, and participants in a transparent way.
+3.  **Complex Logistics Management:** Managing travel, accommodations, and stipend disbursements for sponsored hackers is often a chaotic process, lacking a single source of truth and making audits difficult.
 
-## Expanding the ESLint configuration
+Our Ops Hub addresses these challenges by creating a transparent, verifiable, and efficient system for managing event operations.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🌊 How We Integrate AQUA Protocol
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+The core of the Ops Hub's trust and transparency comes from its integration with the **Aqua Protocol**. We use Aqua to create a tamper-proof, verifiable audit trail for all key logistical operations.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+-   **Verifiable Approvals:** When an organizer approves a travel request, an Aqua attestation is created. This serves as an immutable proof of approval, containing details like the stipend amount and itinerary.
+-   **On-Site Check-Ins:** Participants can be checked into venues using a QR code linked to their approval attestation. Each scan generates a signed "check-in" event, providing a verifiable record of attendance.
+-   **Transparent Payouts:** When stipends/payments are disbursed, the transaction is recorded and linked to the participant's record as another Aqua proof. This closes the loop from approval to payment.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+By using Aqua, we move critical operational data from fragile spreadsheets to a decentralized trust network, making the entire process transparent and auditable for organizers, participants, and auditors.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🚀 Getting Started
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+To run the project locally, follow these steps:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/FredMunene/eth-safari_2.0
+    cd eth-safari_2.0
+    ```
+
+2.  **Install dependencies:**
+    This project uses `npm` as its package manager.
+    ```bash
+    npm install
+    ```
+
+3.  **Set up environment variables:**
+    You will need to create a `.env` file in the root of the project and add your Supabase and Privy credentials.
+    ```
+    VITE_SUPABASE_URL=your-supabase-url
+    VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+    VITE_PRIVY_APP_ID=your-privy-app-id
+    ```
+
+4.  **Run the development server:**
+    ```bash
+    npm run dev
+    ```
+    The application will be available at `http://localhost:5173` (or another port if 5173 is in use).
+
+## 🛠️ Tech Stack
+
+-   **Frontend:** React, TypeScript, Vite, Tailwind CSS
+-   **Backend:** Supabase (for database and serverless functions)
+-   **Authentication:** Privy
+-   **Decentralized Trust:** Aqua Protocol
