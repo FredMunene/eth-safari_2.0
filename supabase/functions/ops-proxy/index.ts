@@ -1,9 +1,8 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-import { corsHeaders } from 'https://esm.sh/@supabase/functions-js@2.4.1/dist/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { PrivyClient } from 'https://esm.sh/@privy-io/server-auth@1.32.5?target=deno';
 import { z } from 'https://esm.sh/zod@3.23.8';
 import Aquafier from 'npm:aqua-js-sdk';
+import { importSPKI, jwtVerify } from 'npm:jose@4.15.4';
 
 const supabaseUrl =
   Deno.env.get('SUPABASE_URL') ||
@@ -15,6 +14,11 @@ const supabaseServiceRoleKey =
   Deno.env.get('APP_SUPABASE_SERVICE_KEY');
 const privyAppId = Deno.env.get('PRIVY_APP_ID');
 const privyAppSecret = Deno.env.get('PRIVY_APP_SECRET');
+const privyApiUrl = Deno.env.get('PRIVY_API_URL') || 'https://auth.privy.io';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 const aquaEnabled = Deno.env.get('AQUA_ENABLED') !== 'false';
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -32,8 +36,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   },
 });
 
-const privy = new PrivyClient(privyAppId, privyAppSecret);
 const aquafier = aquaEnabled ? new Aquafier() : null;
+let cachedVerificationKey: CryptoKey | null = null;
+let cachedVerificationKeyRaw: string | null = null;
 
 const issueApprovalSchema = z.object({
   participant: z.object({
@@ -121,10 +126,9 @@ async function authenticate(request: Request) {
     return null;
   }
   try {
-    const claims = await privy.verifyAuthToken(token);
+    const claims = await verifyPrivyToken(token);
     return claims;
   } catch (error) {
-    console.error('Privy token verification failed', error);
     return null;
   }
 }
@@ -167,6 +171,48 @@ async function ensureParticipant(participant: IssueApprovalInput['participant'])
 type AttestationResult = {
   hash: string | null;
 };
+
+async function getPrivyVerificationKey() {
+  if (cachedVerificationKey && cachedVerificationKeyRaw) {
+    return cachedVerificationKey;
+  }
+
+  if (!privyAppId || !privyAppSecret) {
+    throw new Error('Missing Privy credentials for verification');
+  }
+
+  const response = await fetch(`${privyApiUrl}/api/v1/apps/${privyAppId}`, {
+    headers: {
+      Authorization: `Basic ${btoa(`${privyAppId}:${privyAppSecret}`)}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch Privy app settings');
+  }
+
+  const data = await response.json();
+  const verificationKey = data.verification_key || data.verificationKey;
+  if (!verificationKey) {
+    throw new Error('Privy verification key missing');
+  }
+
+  cachedVerificationKeyRaw = verificationKey;
+  cachedVerificationKey = await importSPKI(verificationKey, 'ES256');
+  return cachedVerificationKey;
+}
+
+async function verifyPrivyToken(token: string) {
+  try {
+    const key = await getPrivyVerificationKey();
+    const result = await jwtVerify(token, key);
+    return result.payload as Record<string, any>;
+  } catch (error) {
+    console.error('Privy token verification failed', error);
+    throw error;
+  }
+}
 
 async function createAquaAttestation(kind: string, payload: Record<string, unknown>): Promise<AttestationResult | null> {
   if (!aquaEnabled || !aquafier) {
