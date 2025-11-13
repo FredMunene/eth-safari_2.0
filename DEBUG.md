@@ -105,3 +105,19 @@
 **Notes / Lessons Learned:**  
 - Provide better inline error UI than `alert` so finance can see why an update failed.  
 - With payouts migrated, only residual anon mutations remain in areas like future Aqua attestations.  
+
+## [2025-11-13] Issue-ID: rls-lockdown
+**Context:**  
+- After migrating approvals, check-ins, and payouts to the ops proxy we can finally disable anon inserts/updates.  
+
+**Error / Symptom:**  
+- None yet, but leaving permissive RLS in place would allow direct writes from the browser.  
+
+**Root Cause:**  
+- Original policies granted `anon` + `authenticated` roles full DML access.  
+
+**Fix / Change:**  
+- Added migration `20251113140000_tighten_rls.sql` that drops insert/update policies and leaves read-only access for anon; service-role key now exclusively handles mutations.  
+
+**Notes / Lessons Learned:**  
+- After applying the migration, frontends must rely on the proxy; monitor for any lingering direct writes before enabling.  

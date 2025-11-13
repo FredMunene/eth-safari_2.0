@@ -65,6 +65,7 @@ Not applicable yet. Aqua attestations are handled off-chain through the JS SDK; 
   supabase db push
   ```  
 - (Optional) Seed participants manually via Supabase dashboard or by inserting rows through the Travel Approval form once the UI is running.  
+- Apply the latest RLS hardening migration (`20251113140000_tighten_rls.sql`) so anon clients remain read-only while the service-role proxy handles mutations.  
 
 ## 6. Common Deployment Pitfalls
 - **Missing env vars:** The app throws `Missing Supabase environment variables` during start/build if either `VITE_SUPABASE_URL` or `VITE_SUPABASE_SUPABASE_ANON_KEY` is absent. Double-check host-level config.  

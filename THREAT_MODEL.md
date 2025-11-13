@@ -29,7 +29,7 @@
 - Introduce Supabase Edge Function or backend API to validate QR tokens + signatures before writing. (In progress via `ops-proxy`.)  
 - Monitor activity_log for spikes via Supabase alerts.  
 
-**Status:** Mitigation in progress (ops proxy exists; UI still migrating away from direct anon writes).  
+**Status:** Mitigated — anon insert/update policies removed; only service-role proxy can mutate tables.  
 
 ### T-002: QR Token Leakage & Replay
 **Description:**  
