@@ -19,6 +19,16 @@ Create `.env` (or configure your host) with the following vars:
 
 Restart the dev server whenever these values change; Vite only injects `import.meta.env` at build/start.  
 
+> Supabase CLI forbids secrets that begin with `SUPABASE_`. When setting secrets via `supabase secrets set`, use aliases such as `PROJECT_URL` and `SERVICE_ROLE_KEY`; the ops proxy automatically falls back to those names. Example:  
+> ```bash
+> supabase secrets set \
+>   PROJECT_URL=https://<project>.supabase.co \
+>   SERVICE_ROLE_KEY=<service-role-key> \
+>   PRIVY_APP_ID=<id> \
+>   PRIVY_APP_SECRET=<secret> \
+>   AQUA_ENABLED=true
+> ```  
+
 ## 3. Smart Contracts
 Not applicable yet. Aqua attestations are handled off-chain through the JS SDK; contract deployments will be documented once on-chain components exist.  
 
