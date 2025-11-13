@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { DollarSign, CheckCircle, X, AlertCircle } from 'lucide-react';
+import { usePrivy } from '@privy-io/react-auth';
 import { supabase, type Payout, type TravelApproval, type Participant } from '../lib/supabase';
+import { completePayoutRequest } from '../lib/opsProxy';
 
 type PayoutWithDetails = Payout & {
   travel_approval?: TravelApproval & {
@@ -20,6 +22,7 @@ export default function PayoutConsole({ onClose, onSuccess }: Props) {
   const [proofType, setProofType] = useState<'receipt' | 'tx_hash' | 'bank_transfer'>('tx_hash');
   const [proofData, setProofData] = useState('');
   const [processing, setProcessing] = useState(false);
+  const { getAccessToken } = usePrivy();
 
   useEffect(() => {
     loadPayouts();
@@ -66,28 +69,16 @@ export default function PayoutConsole({ onClose, onSuccess }: Props) {
 
     setProcessing(true);
     try {
-      const { error: updateError } = await supabase
-        .from('payouts')
-        .update({
-          status: 'completed',
-          proof_type: proofType,
-          proof_data: proofData,
-          processed_at: new Date().toISOString(),
-        })
-        .eq('id', selectedPayout.id);
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error('Unable to fetch Privy access token. Please re-authenticate.');
+      }
 
-      if (updateError) throw updateError;
-
-      await supabase.from('activity_log').insert({
-        event_type: 'payout',
-        participant_id: selectedPayout.travel_approval?.participant?.id,
-        description: `Payout of $${selectedPayout.amount} marked as completed`,
-        metadata: {
-          payout_id: selectedPayout.id,
-          proof_type: proofType,
-          amount: selectedPayout.amount,
-        },
-        aqua_verified: false,
+      await completePayoutRequest(accessToken, {
+        payoutId: selectedPayout.id,
+        proofType,
+        proofData,
+        status: 'completed',
       });
 
       setSelectedPayout(null);
@@ -96,7 +87,7 @@ export default function PayoutConsole({ onClose, onSuccess }: Props) {
       onSuccess();
     } catch (error) {
       console.error('Error processing payout:', error);
-      alert('Failed to process payout. Please try again.');
+      alert((error as { message?: string })?.message ?? 'Failed to process payout. Please try again.');
     } finally {
       setProcessing(false);
     }

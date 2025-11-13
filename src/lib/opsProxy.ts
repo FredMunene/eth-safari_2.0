@@ -40,6 +40,13 @@ export type RecordCheckInParams = {
   location?: string;
 };
 
+export type CompletePayoutParams = {
+  payoutId: string;
+  proofType?: 'receipt' | 'tx_hash' | 'bank_transfer';
+  proofData?: string;
+  status?: 'pending' | 'processing' | 'completed' | 'failed';
+};
+
 export async function issueTravelApprovalRequest(accessToken: string, payload: IssueApprovalParams) {
   if (!functionsBase) {
     throw new Error('Supabase functions URL not configured');
@@ -93,6 +100,42 @@ export async function recordCheckInRequest(accessToken: string, payload: RecordC
       payload: {
         token: payload.token,
         location: payload.location ?? 'ETH Safari Venue',
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Ops proxy request failed';
+    try {
+      const data = await response.json();
+      errorMessage = data.error || errorMessage;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+export async function completePayoutRequest(accessToken: string, payload: CompletePayoutParams) {
+  if (!functionsBase) {
+    throw new Error('Supabase functions URL not configured');
+  }
+
+  const response = await fetch(`${functionsBase}/ops-proxy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      action: 'complete_payout',
+      payload: {
+        payoutId: payload.payoutId,
+        proofType: payload.proofType,
+        proofData: payload.proofData,
+        status: payload.status ?? 'completed',
       },
     }),
   });

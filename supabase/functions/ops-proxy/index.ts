@@ -49,6 +49,15 @@ const recordCheckInSchema = z.object({
 
 type RecordCheckInInput = z.infer<typeof recordCheckInSchema>;
 
+const completePayoutSchema = z.object({
+  payoutId: z.string().uuid(),
+  proofType: z.enum(['receipt', 'tx_hash', 'bank_transfer']).optional(),
+  proofData: z.string().optional().nullable(),
+  status: z.enum(['pending', 'processing', 'completed', 'failed']).default('completed'),
+});
+
+type CompletePayoutInput = z.infer<typeof completePayoutSchema>;
+
 type ProxyPayload =
   | {
       action: 'issue_travel_approval';
@@ -57,6 +66,10 @@ type ProxyPayload =
   | {
       action: 'record_check_in';
       payload: RecordCheckInInput;
+    }
+  | {
+      action: 'complete_payout';
+      payload: CompletePayoutInput;
     }
   | {
       action: 'health';
@@ -184,6 +197,46 @@ async function recordCheckIn(payload: RecordCheckInInput, operatorId: string) {
   };
 }
 
+async function completePayout(payload: CompletePayoutInput, operatorId: string) {
+  const { data: payout, error } = await supabase
+    .from('payouts')
+    .select('id, amount, travel_approval_id, travel_approvals(participant_id, participants(name))')
+    .eq('id', payload.payoutId)
+    .maybeSingle();
+
+  if (error || !payout) {
+    throw new Error('Payout not found');
+  }
+
+  const { error: updateError } = await supabase
+    .from('payouts')
+    .update({
+      status: payload.status,
+      proof_type: payload.proofType ?? null,
+      proof_data: payload.proofData ?? null,
+      processed_at: payload.status === 'completed' ? new Date().toISOString() : null,
+    })
+    .eq('id', payload.payoutId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  await supabase.from('activity_log').insert({
+    event_type: 'payout',
+    participant_id: payout.travel_approvals?.participant_id ?? null,
+    description: `Payout of $${payout.amount} marked as ${payload.status}`,
+    metadata: {
+      payout_id: payout.id,
+      proof_type: payload.proofType,
+      operator_privy_user: operatorId,
+    },
+    aqua_verified: false,
+  });
+
+  return { payoutId: payout.id, status: payload.status };
+}
+
 async function handleRequest(request: Request) {
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -241,6 +294,13 @@ async function handleRequest(request: Request) {
       case 'record_check_in': {
         const payload = recordCheckInSchema.parse(body.payload);
         const result = await recordCheckIn(payload, claims.userId);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      case 'complete_payout': {
+        const payload = completePayoutSchema.parse(body.payload);
+        const result = await completePayout(payload, claims.userId);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
