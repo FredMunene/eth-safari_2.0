@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { PrivyProvider, type PrivyClientConfig } from '@privy-io/react-auth';
 import './index.css';
 import App from './App.tsx';
+import OnboardingApp from './OnboardingApp';
 
 const privyAppId = import.meta.env.VITE_PRIVY_APP_ID;
 
@@ -22,10 +23,12 @@ const privyConfig: PrivyClientConfig = {
   },
 };
 
+const isOnboardingRoute = window.location.pathname.startsWith('/apply');
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <PrivyProvider appId={privyAppId} config={privyConfig}>
-      <App />
+      {isOnboardingRoute ? <OnboardingApp /> : <App />}
     </PrivyProvider>
   </StrictMode>
 );

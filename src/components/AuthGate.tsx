@@ -3,9 +3,21 @@ import { usePrivy } from '@privy-io/react-auth';
 
 type Props = {
   children: ReactNode;
+  badgeText?: string;
+  title?: string;
+  subtitle?: string;
+  buttonLabel?: string;
+  helperText?: string;
 };
 
-export default function AuthGate({ children }: Props) {
+export default function AuthGate({
+  children,
+  badgeText = 'ETH Safari Ops Hub',
+  title = 'Sign in to continue',
+  subtitle = 'Connect with your wallet, passkey, or email via Privy. Only authenticated operators can issue approvals or payouts.',
+  buttonLabel = 'Launch Privy',
+  helperText = 'Need access? Ping the Ops lead for an invite so your wallet can be provisioned.',
+}: Props) {
   const { ready, authenticated, login } = usePrivy();
 
   if (!ready) {
@@ -24,23 +36,19 @@ export default function AuthGate({ children }: Props) {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
         <div className="bg-white/95 rounded-2xl shadow-2xl max-w-md w-full p-8 space-y-6 border border-slate-100">
           <div>
-            <p className="text-sm uppercase tracking-wide text-sage-600 font-semibold mb-1">ETH Safari Ops Hub</p>
-            <h1 className="text-2xl font-bold text-slate-900">Sign in to continue</h1>
-            <p className="text-sm text-slate-600 mt-2">
-              Connect with your wallet, passkey, or email via Privy. Only authenticated operators can issue approvals or payouts.
-            </p>
+            <p className="text-sm uppercase tracking-wide text-sage-600 font-semibold mb-1">{badgeText}</p>
+            <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+            <p className="text-sm text-slate-600 mt-2">{subtitle}</p>
           </div>
 
           <button
             onClick={() => login()}
             className="w-full py-3 px-4 bg-sage-600 text-white font-semibold rounded-lg shadow-sm hover:bg-sage-700 transition-colors"
           >
-            Launch Privy
+            {buttonLabel}
           </button>
 
-          <p className="text-xs text-slate-500 text-center">
-            Need access? Ping the Ops lead for an invite so your wallet can be provisioned.
-          </p>
+          <p className="text-xs text-slate-500 text-center">{helperText}</p>
         </div>
       </div>
     );

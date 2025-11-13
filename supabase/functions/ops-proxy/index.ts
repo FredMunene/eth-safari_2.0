@@ -61,6 +61,23 @@ const completePayoutSchema = z.object({
 
 type CompletePayoutInput = z.infer<typeof completePayoutSchema>;
 
+const createInviteSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  role: z.string().min(1),
+});
+
+type CreateInviteInput = z.infer<typeof createInviteSchema>;
+
+const submitOnboardingSchema = z.object({
+  token: z.string().uuid(),
+  itinerary: z.string().min(1),
+  stipendAmount: z.number().nonnegative(),
+  notes: z.string().optional().nullable(),
+});
+
+type SubmitOnboardingInput = z.infer<typeof submitOnboardingSchema>;
+
 type ProxyPayload =
   | {
       action: 'issue_travel_approval';
@@ -73,6 +90,14 @@ type ProxyPayload =
   | {
       action: 'complete_payout';
       payload: CompletePayoutInput;
+    }
+  | {
+      action: 'create_onboarding_invite';
+      payload: CreateInviteInput;
+    }
+  | {
+      action: 'submit_onboarding';
+      payload: SubmitOnboardingInput;
     }
   | {
       action: 'health';
@@ -101,6 +126,18 @@ async function authenticate(request: Request) {
 async function ensureParticipant(participant: IssueApprovalInput['participant']) {
   if (participant.id) {
     return participant.id;
+  }
+
+  if (participant.email) {
+    const { data: existing } = await supabase
+      .from('participants')
+      .select('id')
+      .eq('email', participant.email)
+      .maybeSingle();
+
+    if (existing?.id) {
+      return existing.id as string;
+    }
   }
 
   const { data, error } = await supabase
@@ -322,6 +359,127 @@ async function completePayout(payload: CompletePayoutInput, operatorId: string) 
   return { payoutId: payout.id, status: payload.status };
 }
 
+async function createOnboardingInvite(payload: CreateInviteInput, operatorId: string) {
+  const token = crypto.randomUUID();
+  const { data: invite, error } = await supabase
+    .from('onboarding_invites')
+    .insert({
+      name: payload.name,
+      email: payload.email,
+      role: payload.role,
+      token,
+    })
+    .select('*')
+    .single();
+
+  if (error || !invite) {
+    throw new Error(error?.message ?? 'Failed to create invite');
+  }
+
+  await supabase.from('activity_log').insert({
+    event_type: 'system',
+    participant_id: null,
+    description: `Onboarding invite issued to ${payload.email}`,
+    metadata: {
+      invite_id: invite.id,
+      operator_privy_user: operatorId,
+    },
+    aqua_verified: false,
+  });
+
+  return { token, invite };
+}
+
+async function submitOnboarding(payload: SubmitOnboardingInput, operatorId: string) {
+  const { data: invite, error } = await supabase
+    .from('onboarding_invites')
+    .select('*')
+    .eq('token', payload.token)
+    .maybeSingle();
+
+  if (error || !invite) {
+    throw new Error('Invite not found');
+  }
+
+  if (invite.status !== 'pending') {
+    throw new Error('Invite already submitted');
+  }
+
+  const participantId = await ensureParticipant({
+    id: invite.participant_id ?? undefined,
+    name: invite.name,
+    email: invite.email,
+    role: invite.role,
+    photo_url: null,
+  });
+
+  const { data: approval, error: approvalError } = await supabase
+    .from('travel_approvals')
+    .insert({
+      participant_id: participantId,
+      itinerary: payload.itinerary,
+      stipend_amount: payload.stipendAmount,
+      sponsor_notes: payload.notes ?? null,
+      status: 'pending',
+      qr_token: crypto.randomUUID(),
+    })
+    .select('*')
+    .single();
+
+  if (approvalError || !approval) {
+    throw new Error(`Failed to create travel approval: ${approvalError?.message ?? 'unknown error'}`);
+  }
+
+  const attestation = await createAquaAttestation('onboarding_submission', {
+    approvalId: approval.id,
+    participantId,
+    itinerary: payload.itinerary,
+    stipendAmount: payload.stipendAmount,
+    operator_privy_user: operatorId,
+  });
+
+  if (attestation?.hash) {
+    await supabase
+      .from('travel_approvals')
+      .update({ aqua_attestation_hash: attestation.hash })
+      .eq('id', approval.id);
+  }
+
+  await supabase
+    .from('onboarding_invites')
+    .update({
+      status: 'submitted',
+      form_data: {
+        itinerary: payload.itinerary,
+        stipendAmount: payload.stipendAmount,
+        notes: payload.notes ?? null,
+      },
+      participant_id: participantId,
+      travel_approval_id: approval.id,
+      submitted_at: new Date().toISOString(),
+    })
+    .eq('id', invite.id);
+
+  await supabase.from('activity_log').insert({
+    event_type: 'system',
+    participant_id: participantId,
+    description: `${invite.name} submitted onboarding form`,
+    metadata: {
+      invite_id: invite.id,
+      approval_id: approval.id,
+      operator_privy_user: operatorId,
+      aqua_hash: attestation?.hash ?? null,
+    },
+    aqua_verified: Boolean(attestation?.hash),
+  });
+
+  return {
+    inviteId: invite.id,
+    travelApprovalId: approval.id,
+    status: 'submitted',
+  };
+}
+
 async function handleRequest(request: Request) {
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -386,6 +544,20 @@ async function handleRequest(request: Request) {
       case 'complete_payout': {
         const payload = completePayoutSchema.parse(body.payload);
         const result = await completePayout(payload, claims.userId);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      case 'create_onboarding_invite': {
+        const payload = createInviteSchema.parse(body.payload);
+        const result = await createOnboardingInvite(payload, claims.userId);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      case 'submit_onboarding': {
+        const payload = submitOnboardingSchema.parse(body.payload);
+        const result = await submitOnboarding(payload, claims.userId);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

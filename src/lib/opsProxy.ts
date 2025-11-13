@@ -47,6 +47,19 @@ export type CompletePayoutParams = {
   status?: 'pending' | 'processing' | 'completed' | 'failed';
 };
 
+export type CreateInviteParams = {
+  name: string;
+  email: string;
+  role: string;
+};
+
+export type SubmitOnboardingParams = {
+  token: string;
+  itinerary: string;
+  stipendAmount: number;
+  notes?: string;
+};
+
 export async function issueTravelApprovalRequest(accessToken: string, payload: IssueApprovalParams) {
   if (!functionsBase) {
     throw new Error('Supabase functions URL not configured');
@@ -77,6 +90,73 @@ export async function issueTravelApprovalRequest(accessToken: string, payload: I
       errorMessage = data.error || errorMessage;
     } catch {
       // ignore JSON parse errors
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+export async function createInviteRequest(accessToken: string, payload: CreateInviteParams) {
+  if (!functionsBase) {
+    throw new Error('Supabase functions URL not configured');
+  }
+
+  const response = await fetch(`${functionsBase}/ops-proxy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      action: 'create_onboarding_invite',
+      payload,
+    }),
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Ops proxy request failed';
+    try {
+      const data = await response.json();
+      errorMessage = data.error || errorMessage;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+export async function submitOnboardingRequest(accessToken: string, payload: SubmitOnboardingParams) {
+  if (!functionsBase) {
+    throw new Error('Supabase functions URL not configured');
+  }
+
+  const response = await fetch(`${functionsBase}/ops-proxy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      action: 'submit_onboarding',
+      payload: {
+        token: payload.token,
+        itinerary: payload.itinerary,
+        stipendAmount: payload.stipendAmount,
+        notes: payload.notes ?? null,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Ops proxy request failed';
+    try {
+      const data = await response.json();
+      errorMessage = data.error || errorMessage;
+    } catch {
+      // ignore
     }
     throw new Error(errorMessage);
   }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
-import { Plus, QrCode, DollarSign } from 'lucide-react';
+import { Plus, QrCode, DollarSign, MailPlus } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import TravelApprovalForm from './components/TravelApprovalForm';
 import QRScanner from './components/QRScanner';
@@ -8,6 +8,7 @@ import PayoutConsole from './components/PayoutConsole';
 import ParticipantTimeline from './components/ParticipantTimeline';
 import type { Participant, TravelApproval } from './lib/supabase';
 import AuthGate from './components/AuthGate';
+import InviteManager from './components/InviteManager';
 
 type ParticipantRow = Participant & {
   travel_approval?: TravelApproval;
@@ -22,6 +23,7 @@ function AppShell() {
   const [showApprovalForm, setShowApprovalForm] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showPayoutConsole, setShowPayoutConsole] = useState(false);
+  const [showInviteManager, setShowInviteManager] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<ParticipantRow | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const { user, logout } = usePrivy();
@@ -54,6 +56,13 @@ function AppShell() {
             </div>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-end">
               <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => setShowInviteManager(true)}
+                  className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  <MailPlus className="h-4 w-4" />
+                  Invites
+                </button>
                 <button
                   onClick={() => setShowApprovalForm(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
@@ -129,6 +138,10 @@ function AppShell() {
           participant={selectedParticipant}
           onClose={() => setSelectedParticipant(null)}
         />
+      )}
+
+      {showInviteManager && (
+        <InviteManager onClose={() => setShowInviteManager(false)} />
       )}
     </div>
   );
