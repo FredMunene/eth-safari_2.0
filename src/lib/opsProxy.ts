@@ -35,6 +35,11 @@ export type IssueApprovalParams = {
   status: 'pending' | 'approved' | 'rejected';
 };
 
+export type RecordCheckInParams = {
+  token: string;
+  location?: string;
+};
+
 export async function issueTravelApprovalRequest(accessToken: string, payload: IssueApprovalParams) {
   if (!functionsBase) {
     throw new Error('Supabase functions URL not configured');
@@ -65,6 +70,40 @@ export async function issueTravelApprovalRequest(accessToken: string, payload: I
       errorMessage = data.error || errorMessage;
     } catch {
       // ignore JSON parse errors
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+export async function recordCheckInRequest(accessToken: string, payload: RecordCheckInParams) {
+  if (!functionsBase) {
+    throw new Error('Supabase functions URL not configured');
+  }
+
+  const response = await fetch(`${functionsBase}/ops-proxy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      action: 'record_check_in',
+      payload: {
+        token: payload.token,
+        location: payload.location ?? 'ETH Safari Venue',
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Ops proxy request failed';
+    try {
+      const data = await response.json();
+      errorMessage = data.error || errorMessage;
+    } catch {
+      // ignore
     }
     throw new Error(errorMessage);
   }

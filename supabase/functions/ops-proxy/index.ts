@@ -42,10 +42,21 @@ const issueApprovalSchema = z.object({
 
 type IssueApprovalInput = z.infer<typeof issueApprovalSchema>;
 
+const recordCheckInSchema = z.object({
+  token: z.string().min(1),
+  location: z.string().min(1).default('ETH Safari Venue'),
+});
+
+type RecordCheckInInput = z.infer<typeof recordCheckInSchema>;
+
 type ProxyPayload =
   | {
       action: 'issue_travel_approval';
       payload: IssueApprovalInput;
+    }
+  | {
+      action: 'record_check_in';
+      payload: RecordCheckInInput;
     }
   | {
       action: 'health';
@@ -131,6 +142,48 @@ async function issueTravelApproval(payload: IssueApprovalInput, operatorId: stri
   return { approval };
 }
 
+async function recordCheckIn(payload: RecordCheckInInput, operatorId: string) {
+  const { data: approval, error } = await supabase
+    .from('travel_approvals')
+    .select('id, participant_id, status, participants(name, role)')
+    .eq('qr_token', payload.token)
+    .maybeSingle();
+
+  if (error || !approval) {
+    throw new Error('Approval not found or invalid token');
+  }
+
+  if (approval.status !== 'approved') {
+    throw new Error('Travel approval is not in approved status');
+  }
+
+  const { error: insertError } = await supabase.from('check_ins').insert({
+    travel_approval_id: approval.id,
+    location: payload.location,
+    timestamp: new Date().toISOString(),
+  });
+
+  if (insertError) {
+    throw new Error(insertError.message);
+  }
+
+  await supabase.from('activity_log').insert({
+    event_type: 'check_in',
+    participant_id: approval.participant_id,
+    description: `${approval.participants?.name ?? 'Participant'} checked in`,
+    metadata: {
+      approval_id: approval.id,
+      location: payload.location,
+      operator_privy_user: operatorId,
+    },
+    aqua_verified: false,
+  });
+
+  return {
+    participant: approval.participants,
+  };
+}
+
 async function handleRequest(request: Request) {
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -181,6 +234,13 @@ async function handleRequest(request: Request) {
       case 'issue_travel_approval': {
         const payload = issueApprovalSchema.parse(body.payload);
         const result = await issueTravelApproval(payload, claims.userId);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      case 'record_check_in': {
+        const payload = recordCheckInSchema.parse(body.payload);
+        const result = await recordCheckIn(payload, claims.userId);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

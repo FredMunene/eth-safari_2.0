@@ -72,6 +72,7 @@
 - Look at console errors for `check_ins` insert failure codes (e.g., 42501 not authorized, 23505 duplicate).  
 - Validate that `travel_approval_id` encoded in the QR token matches an existing approval row.  
 - Ensure device/browser allows camera usage (permissions prompt).  
+- Confirm the ops proxy is reachable (`GET /ops-proxy`) and the client is sending a Privy access token (Network tab should show `Authorization: Bearer …`).  
 
 **Mitigation:**  
 - Duplicate token: generate a fresh approval (issue new QR) or manually delete the stuck `check_ins` row.  

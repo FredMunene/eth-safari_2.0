@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import { Camera, X, CheckCircle, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { usePrivy } from '@privy-io/react-auth';
+import { recordCheckInRequest } from '../lib/opsProxy';
 
 type Props = {
   onClose: () => void;
@@ -24,6 +25,7 @@ export default function QRScanner({ onClose, onSuccess }: Props) {
   const [manualToken, setManualToken] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const { getAccessToken } = usePrivy();
 
   useEffect(() => {
     checkCamera();
@@ -98,52 +100,22 @@ export default function QRScanner({ onClose, onSuccess }: Props) {
         return;
       }
 
-      const { data: approval, error: approvalError } = await supabase
-        .from('travel_approvals')
-        .select('*, participants(*)')
-        .eq('qr_token', payload.token)
-        .maybeSingle();
-
-      if (approvalError || !approval) {
-        setResult({
-          success: false,
-          message: 'Approval not found or invalid token',
-        });
-        return;
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error('Unable to fetch Privy access token. Please re-authenticate.');
       }
 
-      if (approval.status !== 'approved') {
-        setResult({
-          success: false,
-          message: 'Travel approval is not in approved status',
-        });
-        return;
-      }
-
-      const { error: checkInError } = await supabase
-        .from('check_ins')
-        .insert({
-          travel_approval_id: approval.id,
-          location: 'ETH Safari Venue',
-          timestamp: new Date().toISOString(),
-        });
-
-      if (checkInError) throw checkInError;
-
-      await supabase.from('activity_log').insert({
-        event_type: 'check_in',
-        participant_id: approval.participant_id,
-        description: `${approval.participants.name} checked in at venue`,
-        metadata: { approval_id: approval.id, location: 'ETH Safari Venue' },
-        aqua_verified: false,
+      const data = await recordCheckInRequest(accessToken, {
+        token: payload.token,
+        location: 'ETH Safari Venue',
       });
 
       setResult({
         success: true,
         message: 'Check-in successful!',
         participant: {
-          name: approval.participants.name,
-          role: approval.participants.role,
+          name: data.participant?.name ?? 'Participant',
+          role: data.participant?.role ?? 'Attendee',
         },
       });
 
@@ -155,7 +127,7 @@ export default function QRScanner({ onClose, onSuccess }: Props) {
       console.error('Error processing QR code:', error);
       setResult({
         success: false,
-        message: 'Failed to process QR code',
+        message: (error as { message?: string })?.message ?? 'Failed to process QR code',
       });
     }
   }

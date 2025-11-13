@@ -70,3 +70,21 @@
 **Notes / Lessons Learned:**  
 - Provide a derivation fallback for the functions URL so local dev works even if the env var is missing (with a console warning).  
 - After proxy migration, remaining write paths (QR scanner, payouts) should follow the same pattern before we flip RLS.  
+
+## [2025-11-13] Issue-ID: qr-scanner-proxy-integration
+**Context:**  
+- Migrated the QR scanner to use the Privy-authenticated ops proxy instead of direct Supabase inserts.  
+
+**Error / Symptom:**  
+- None in production, but camera scans would have continued inserting via anon role, blocking the RLS tightening plan.  
+
+**Root Cause:**  
+- QR scanner never fetched Privy access tokens or delegated write access to the service-role function.  
+
+**Fix / Change:**  
+- Added `record_check_in` action inside `supabase/functions/ops-proxy`, plus a `recordCheckInRequest` helper in `src/lib/opsProxy.ts`.  
+- Updated `QRScanner` to request a Privy access token, call the proxy, and display the returned participant metadata / error messages.  
+
+**Notes / Lessons Learned:**  
+- Manual QR entry can reuse the same proxy path; no extra Supabase reads are needed in the browser.  
+- Once payouts shift to the proxy we can confidently lock RLS to service-role only.  
