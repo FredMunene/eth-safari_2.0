@@ -1,0 +1,119 @@
+# Runbook
+
+## 1. System Overview
+- **Ops Hub Web App (Vite + React):** Provides Ops Lead panel, participant portal, QR scanner, payout console. Reads/writes directly to Supabase via anon client keys.  
+- **Supabase Postgres:** Hosts tables defined in `supabase/migrations/20251112174406_create_ops_hub_schema.sql` plus RLS policies for participants, travel approvals, check-ins, payouts, and activity log.  
+- **Aqua Attestation Hooks:** Not yet automated; placeholders (`aqua_attestation_hash`, `aqua_verified`) store hashes/verifications coming from the Aqua JS SDK once integrated.  
+
+## 2. Routine Procedures
+
+### 2.1 Restarting Services
+1. **Frontend:**  
+   - Local/dev: stop the Vite server (Ctrl+C) and rerun `npm run dev`.  
+   - Production (static host): redeploy the latest `dist/` bundle (Vercel/Netlify redeploy button).  
+   - Verify by loading `/` and confirming the Ops Lead metrics render without network errors in DevTools.  
+2. **Supabase Edge Functions / DB:**  
+   - Not in use yet. Monitor Supabase dashboard → Database → Status for incidents.  
+
+### 2.2 Rotating Keys / Secrets
+1. Generate a new Supabase anon key from Project Settings → API.  
+2. Update `VITE_SUPABASE_SUPABASE_ANON_KEY` wherever the frontend is deployed.  
+3. Restart/redeploy the frontend so `import.meta.env` is rebuilt.  
+4. Smoke test: issue a travel approval in the UI; check browser console for 403/401 errors.  
+
+### 2.3 Running Database Migrations
+1. Install/upgrade Supabase CLI (`brew upgrade supabase/tap/supabase`).  
+2. Link the project: `supabase link --project-ref <ref>`.  
+3. Apply migrations: `supabase db push`.  
+4. Confirm the new tables/indexes exist via Supabase dashboard or `supabase db remote commit`.  
+
+### 2.4 Rotating Privy Keys / Handling Outages
+1. Visit Privy dashboard → Settings → API Keys; create a new **Client ID** / secret pair.  
+2. Update frontend env vars (`VITE_PRIVY_APP_ID`, etc.) and redeploy.  
+3. Update service-role proxy secrets so it can verify Privy tokens (usually `PRIVY_APP_SECRET`).  
+4. Revoke the old key in Privy dashboard once deployments confirm healthy sign-in.  
+5. During Privy outages, switch Ops UI into read-only mode (feature flag) and log the incident in `DEBUG.md`; notify team via status channel.  
+
+### 2.5 Deploying / Rolling Back the Ops Proxy
+1. Ensure Supabase CLI is linked to the project (`supabase link --project-ref <ref>`).  
+2. Deploy the Edge Function: `supabase functions deploy ops-proxy --project-ref <ref> --no-verify-jwt`.  
+3. Update function secrets when credentials rotate:  
+   ```bash
+   supabase secrets set SUPABASE_URL=<url> SUPABASE_SERVICE_ROLE_KEY=<service-role> PRIVY_APP_ID=<id> PRIVY_APP_SECRET=<secret>
+   ```  
+4. Verify health by calling `GET https://<project>.functions.supabase.co/ops-proxy` (should return `{status:"ok"}`).  
+5. Roll back by redeploying the previous commit or using `supabase functions deploy ops-proxy --import-map <old>` if needed.  
+
+## 3. Incident Playbooks
+
+### 3.1 “Timeline Shows No Events”
+**Symptoms:**  
+- Participant Timeline modal renders “No events found” even though approvals/check-ins/payouts exist.  
+
+**Quick Checks:**  
+- Open browser DevTools → Network; verify `travel_approvals`, `check_ins`, `payouts` requests succeed (200s).  
+- Inspect Supabase table counts from dashboard; ensure participant IDs match inserted approval records.  
+- Confirm RLS policies still allow `authenticated`/`anon` reads.  
+
+**Mitigation:**  
+- If requests fail with 401, rotate anon key and redeploy (see §2.2).  
+- If approvals reference missing participants, backfill `participant_id` via SQL or reissue approvals through the form.  
+- If Supabase outage, queue manual updates in `DEBUG.md` and re-run `loadTimeline` after service recovery.  
+
+**Follow-Up:**  
+- Record the outage/bug in `DEBUG.md`.  
+- Evaluate whether an ADR is needed for caching or API layer changes.  
+
+### 3.2 “QR Scanner Cannot Save Check-Ins”
+**Symptoms:**  
+- QR scanner view confirms scan but Supabase insert fails; attendees stay in “Never checked in”.  
+
+**Quick Checks:**  
+- Look at console errors for `check_ins` insert failure codes (e.g., 42501 not authorized, 23505 duplicate).  
+- Validate that `travel_approval_id` encoded in the QR token matches an existing approval row.  
+- Ensure device/browser allows camera usage (permissions prompt).  
+
+**Mitigation:**  
+- Duplicate token: generate a fresh approval (issue new QR) or manually delete the stuck `check_ins` row.  
+- RLS denies anon insert: temporarily grant `authenticated` role to scanner app or create a service role function; document in ADR before production change.  
+- Camera permission issues: provide manual code entry fallback; instructions already in UI but confirm by testing on a second device.  
+
+**Follow-Up:**  
+- Note remediation steps in `DEBUG.md`.  
+- If security posture changed (e.g., enabling anon inserts), update `THREAT_MODEL.md` and `ADR.md` accordingly.  
+
+### 3.3 “Privy Login Failures”
+**Symptoms:**  
+- Users can’t authenticate (stuck on Privy modal, SIWE signature rejected, 5xx from Privy endpoints).  
+
+**Quick Checks:**  
+- Check https://status.privy.io and Privy dashboard alerts.  
+- Inspect browser console for Privy SDK errors (expired app ID, missing domain).  
+- Confirm environment variables (`VITE_PRIVY_APP_ID`, `PRIVY_APP_SECRET`) match the dashboard.  
+
+**Mitigation:**  
+- If outage: toggle Ops UI into read-only mode and queue manual approvals; document impacted users.  
+- If credentials invalid: rotate app keys (see §2.4) and redeploy frontend + proxy.  
+- If SIWE signature fails, ensure connected wallet has correct chain (Ethereum mainnet by default) or update Privy config to allow testnets.  
+
+**Follow-Up:**  
+- Record in `DEBUG.md` including root cause and mitigation.  
+- Consider adding monitoring/alerting on Privy login failure rate.  
+
+### 3.4 “Ops Proxy Returns 401/500”
+**Symptoms:**  
+- Frontend calls to `/functions/v1/ops-proxy` fail with 401 (unauthorized) or 500 (internal error); travel approvals stop saving.  
+
+**Quick Checks:**  
+- Confirm client is passing `Authorization: Bearer <Privy access token>` (inspect browser network tab).  
+- Hit the proxy health endpoint (`GET /ops-proxy`) to verify deployment is alive and secrets are loaded.  
+- Run `supabase functions logs ops-proxy --project-ref <ref>` to inspect recent stack traces.  
+
+**Mitigation:**  
+- 401s: ensure operators obtain fresh Privy access tokens (`usePrivy().getAccessToken()`), and confirm `PRIVY_APP_SECRET` matches the app in Privy dashboard.  
+- 500s: tail logs, fix validation errors (e.g., missing participant fields), and redeploy the function if code regressions are suspected.  
+- If secrets rotated, rerun `supabase secrets set ...` and redeploy.  
+
+**Follow-Up:**  
+- Document the incident in `DEBUG.md` including root cause.  
+- If the proxy logic needs schema or threat-model updates, capture them in `ADR.md` / `THREAT_MODEL.md`.  
