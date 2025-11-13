@@ -106,6 +106,23 @@
 - Provide better inline error UI than `alert` so finance can see why an update failed.  
 - With payouts migrated, only residual anon mutations remain in areas like future Aqua attestations.  
 
+## [2025-11-13] Issue-ID: aqua-attestations
+**Context:**  
+- Wired `aqua-js-sdk` into the proxy so approvals, check-ins, and payouts emit attestation hashes automatically.  
+
+**Error / Symptom:**  
+- Hash fields stayed empty and `aqua_verified` never flipped because we hadn’t minted attestations.  
+
+**Root Cause:**  
+- Aqua integration had been deferred; proxy simply stored placeholder booleans.  
+
+**Fix / Change:**  
+- Added Aquafier helper in the ops proxy, updated each action to create a genesis revision payload, patch the corresponding row with `aqua_attestation_hash`, and mark activity log entries as verified.  
+
+**Notes / Lessons Learned:**  
+- `createGenesisRevision` is synchronous and doesn’t require credentials, making it lightweight enough for every event.  
+- Leave `AQUA_ENABLED=false` escape hatch in case the SDK misbehaves in production.  
+
 ## [2025-11-13] Issue-ID: rls-lockdown
 **Context:**  
 - After migrating approvals, check-ins, and payouts to the ops proxy we can finally disable anon inserts/updates.  

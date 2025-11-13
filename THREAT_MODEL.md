@@ -43,7 +43,7 @@
 - Bind QR payloads to participant wallet/signature and require server verification before accepting.  
 - Store hashed tokens or encrypt at rest; display QR only through authenticated portal.  
 
-**Status:** Open.  
+**Status:** Mitigated — ops proxy now mints attestations with `aqua-js-sdk` and marks activity logs as verified when hashes are recorded.  
 
 ### T-003: Attestation Spoofing
 **Description:**  

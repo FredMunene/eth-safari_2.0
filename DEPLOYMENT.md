@@ -15,6 +15,7 @@ Create `.env` (or configure your host) with the following vars:
 - `VITE_SUPABASE_FUNCTIONS_URL` — Base URL for Supabase Edge Functions (e.g., `https://<project>.functions.supabase.co`).  
 - `PRIVY_APP_SECRET` — used by the ops proxy to validate Privy access tokens.  
 - `SUPABASE_SERVICE_ROLE_KEY` (proxy only) — grants the proxy insert/update access when running via Supabase Edge Functions.  
+- `AQUA_ENABLED` — defaults to `true`; set to `false` to skip Aqua attestation minting inside the ops proxy.  
 
 Restart the dev server whenever these values change; Vite only injects `import.meta.env` at build/start.  
 
