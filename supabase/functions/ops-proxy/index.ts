@@ -5,8 +5,14 @@ import { PrivyClient } from 'https://esm.sh/@privy-io/server-auth@1.32.5?target=
 import { z } from 'https://esm.sh/zod@3.23.8';
 import Aquafier from 'npm:aqua-js-sdk';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL');
-const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const supabaseUrl =
+  Deno.env.get('SUPABASE_URL') ||
+  Deno.env.get('PROJECT_URL') ||
+  Deno.env.get('APP_SUPABASE_URL');
+const supabaseServiceRoleKey =
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
+  Deno.env.get('SERVICE_ROLE_KEY') ||
+  Deno.env.get('APP_SUPABASE_SERVICE_KEY');
 const privyAppId = Deno.env.get('PRIVY_APP_ID');
 const privyAppSecret = Deno.env.get('PRIVY_APP_SECRET');
 const aquaEnabled = Deno.env.get('AQUA_ENABLED') !== 'false';
