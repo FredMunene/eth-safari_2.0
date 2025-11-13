@@ -12,6 +12,7 @@ Create `.env` (or configure your host) with the following vars:
 - `VITE_SUPABASE_URL` — Supabase project REST endpoint. Example: `https://<project-id>.supabase.co`.  
 - `VITE_SUPABASE_SUPABASE_ANON_KEY` — anon service key copied from Supabase dashboard → Project Settings → API. (The double `SUPABASE` prefix is intentional to match existing imports in `src/lib/supabase.ts`.)  
 - `VITE_PRIVY_APP_ID` — Privy application ID for the React SDK.  
+- `VITE_SUPABASE_FUNCTIONS_URL` — Base URL for Supabase Edge Functions (e.g., `https://<project>.functions.supabase.co`).  
 - `PRIVY_APP_SECRET` — used by the ops proxy to validate Privy access tokens.  
 - `SUPABASE_SERVICE_ROLE_KEY` (proxy only) — grants the proxy insert/update access when running via Supabase Edge Functions.  
 

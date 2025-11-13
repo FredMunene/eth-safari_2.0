@@ -52,3 +52,21 @@
 **Notes / Lessons Learned:**  
 - Privy server SDK works via esm.sh when targeting Deno.  
 - Keep approval inserts free of Supabase auth foreign keys (`approved_by`) until we map Privy IDs to Supabase auth UUIDs.  
+
+## [2025-11-13] Issue-ID: approval-form-proxy-integration
+**Context:**  
+- Travel approval modal still wrote directly to Supabase from the browser; switched it to use the Privy-authenticated ops proxy.  
+
+**Error / Symptom:**  
+- None, but missing access token handling would have caused silent failures once RLS tightens.  
+
+**Root Cause:**  
+- Client-side code never fetched Privy access tokens or targeted the Edge Function endpoint.  
+
+**Fix / Change:**  
+- Added `src/lib/opsProxy.ts` helper, new `VITE_SUPABASE_FUNCTIONS_URL` env, and updated `TravelApprovalForm` to request an access token via `usePrivy`, call the proxy, and surface meaningful errors.  
+- Documented the env var + system overview change in `DEPLOYMENT.md` and `RUNBOOK.md`.  
+
+**Notes / Lessons Learned:**  
+- Provide a derivation fallback for the functions URL so local dev works even if the env var is missing (with a console warning).  
+- After proxy migration, remaining write paths (QR scanner, payouts) should follow the same pattern before we flip RLS.  

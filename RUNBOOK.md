@@ -1,7 +1,7 @@
 # Runbook
 
 ## 1. System Overview
-- **Ops Hub Web App (Vite + React):** Provides Ops Lead panel, participant portal, QR scanner, payout console. Reads/writes directly to Supabase via anon client keys.  
+- **Ops Hub Web App (Vite + React):** Provides Ops Lead panel, participant portal, QR scanner, payout console. Reads directly via anon key but routes privileged mutations through the `ops-proxy` Supabase Edge Function using Privy access tokens.  
 - **Supabase Postgres:** Hosts tables defined in `supabase/migrations/20251112174406_create_ops_hub_schema.sql` plus RLS policies for participants, travel approvals, check-ins, payouts, and activity log.  
 - **Aqua Attestation Hooks:** Not yet automated; placeholders (`aqua_attestation_hash`, `aqua_verified`) store hashes/verifications coming from the Aqua JS SDK once integrated.  
 

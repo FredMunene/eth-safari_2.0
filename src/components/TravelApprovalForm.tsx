@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, X } from 'lucide-react';
+import { usePrivy } from '@privy-io/react-auth';
 import { supabase, type Participant } from '../lib/supabase';
 import { generateQRCode, createQRPayload } from '../lib/qr';
+import { issueTravelApprovalRequest, type IssueApprovalParams } from '../lib/opsProxy';
 
 type Props = {
   onClose: () => void;
@@ -23,6 +25,7 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
     sponsorNotes: '',
     isNewParticipant: true,
   });
+  const { getAccessToken } = usePrivy();
 
   useEffect(() => {
     loadParticipants();
@@ -43,55 +46,52 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
     setErrorMessage(null);
 
     try {
-      let participantId = formData.participantId;
-
-      if (formData.isNewParticipant) {
-        const { data: newParticipant, error: participantError } = await supabase
-          .from('participants')
-          .insert({
-            name: formData.participantName,
-            email: formData.participantEmail,
-            role: formData.participantRole,
-          })
-          .select()
-          .single();
-
-        if (participantError) throw participantError;
-        participantId = newParticipant.id;
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error('Unable to fetch Privy access token. Please re-authenticate.');
       }
 
-      const qrToken = crypto.randomUUID();
+      const stipendAmount = parseFloat(formData.stipendAmount);
+      if (Number.isNaN(stipendAmount)) {
+        throw new Error('Enter a valid stipend amount.');
+      }
 
-      const { data: approval, error: approvalError } = await supabase
-        .from('travel_approvals')
-        .insert({
-          participant_id: participantId,
-          itinerary: formData.itinerary,
-          stipend_amount: parseFloat(formData.stipendAmount),
-          sponsor_notes: formData.sponsorNotes || null,
-          status: 'approved',
-          qr_token: qrToken,
-          approved_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+      let participantPayload: IssueApprovalParams['participant'];
 
-      if (approvalError) throw approvalError;
+      if (formData.isNewParticipant) {
+        participantPayload = {
+          name: formData.participantName,
+          email: formData.participantEmail,
+          role: formData.participantRole,
+          photo_url: null,
+        };
+      } else {
+        const existing = participants.find((p) => p.id === formData.participantId);
+        if (!existing) {
+          throw new Error('Select an existing participant before issuing approval.');
+        }
+        participantPayload = {
+          id: existing.id,
+          name: existing.name,
+          email: existing.email,
+          role: existing.role,
+          photo_url: existing.photo_url ?? null,
+        };
+      }
 
-      await supabase.from('activity_log').insert({
-        event_type: 'approval',
-        participant_id: participantId,
-        description: `Travel approval issued for ${formData.isNewParticipant ? formData.participantName : participants.find(p => p.id === participantId)?.name}`,
-        metadata: { approval_id: approval.id, stipend_amount: formData.stipendAmount },
-        aqua_verified: false,
+      await issueTravelApprovalRequest(accessToken, {
+        participant: participantPayload,
+        itinerary: formData.itinerary,
+        stipendAmount,
+        sponsorNotes: formData.sponsorNotes || undefined,
+        status: 'approved',
       });
 
       onSuccess();
     } catch (error) {
       console.error('Error creating approval:', error);
-      const supabaseError = error as { code?: string; message?: string };
-      if (supabaseError?.code === '23505') {
-        setErrorMessage('A participant with this email already exists. Uncheck "New Participant" and pick them from the dropdown.');
+      if ((error as { message?: string })?.message) {
+        setErrorMessage((error as { message: string }).message);
       } else {
         setErrorMessage('Failed to create approval. Please try again.');
       }
