@@ -19,6 +19,8 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+const aquaServiceUrl = Deno.env.get('AQUA_SERVICE_URL');
+const aquaServiceToken = Deno.env.get('AQUA_SERVICE_TOKEN');
 const aquaEnabled = Deno.env.get('AQUA_ENABLED') !== 'false';
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -37,6 +39,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
 });
 
 const aquafier = aquaEnabled ? new Aquafier() : null;
+const aquaServiceConfigured = Boolean(aquaServiceUrl && aquaServiceToken);
+let aquaServiceHealthy: boolean | null = aquaServiceConfigured ? false : null;
+let lastAquaServiceError: string | null = null;
 let cachedVerificationKey: CryptoKey | null = null;
 let cachedVerificationKeyRaw: string | null = null;
 
@@ -214,14 +219,73 @@ async function verifyPrivyToken(token: string) {
   }
 }
 
+async function callAquaService(
+  kind: string,
+  payload: Record<string, unknown>,
+): Promise<AttestationResult | null> {
+  if (!aquaServiceConfigured || !aquaServiceUrl || !aquaServiceToken) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(aquaServiceUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${aquaServiceToken}`,
+      },
+      body: JSON.stringify({ kind, payload }),
+    });
+
+    if (!response.ok) {
+      const message = `Aqua service error ${response.status}`;
+      lastAquaServiceError = message;
+      aquaServiceHealthy = false;
+      console.error(message);
+      return null;
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+    const nested = (data.data as Record<string, unknown> | undefined) ?? undefined;
+    const hash =
+      typeof data.hash === 'string'
+        ? data.hash
+        : nested && typeof nested.hash === 'string'
+          ? (nested.hash as string)
+          : null;
+
+    aquaServiceHealthy = Boolean(hash);
+    lastAquaServiceError = null;
+
+    if (!hash) {
+      console.warn('Aqua service responded without hash');
+      return null;
+    }
+
+    return { hash };
+  } catch (error) {
+    aquaServiceHealthy = false;
+    lastAquaServiceError = (error as Error).message;
+    console.error('Aqua service call failed', error);
+    return null;
+  }
+}
+
 async function createAquaAttestation(kind: string, payload: Record<string, unknown>): Promise<AttestationResult | null> {
+  const document = { ...payload, kind, timestamp: new Date().toISOString() };
+
+  const serviceResult = await callAquaService(kind, document);
+  if (serviceResult?.hash) {
+    return serviceResult;
+  }
+
   if (!aquaEnabled || !aquafier) {
     return null;
   }
   try {
     const fileObject = {
       fileName: `${kind}-${crypto.randomUUID()}.json`,
-      fileContent: JSON.stringify({ ...payload, kind, timestamp: new Date().toISOString() }),
+      fileContent: JSON.stringify(document),
     };
     const result = await aquafier.createGenesisRevision(fileObject);
     if (result?.tag === 'ok') {
@@ -616,7 +680,15 @@ async function handleRequest(request: Request) {
       }
       case 'health': {
         return new Response(
-          JSON.stringify({ status: 'ok', operator: claims.userId }),
+          JSON.stringify({
+            status: 'ok',
+            operator: claims.userId,
+            aquaService: {
+              configured: aquaServiceConfigured,
+              healthy: aquaServiceHealthy,
+              lastError: lastAquaServiceError,
+            },
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }

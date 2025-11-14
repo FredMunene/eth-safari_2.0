@@ -28,36 +28,55 @@ By using Aqua, we move critical operational data from fragile spreadsheets to a 
 
 To run the project locally, follow these steps:
 
-1.  **Clone the repository:**
+1.  **Clone the repository & inspect the layout:**
     ```bash
     git clone https://github.com/FredMunene/eth-safari_2.0
     cd eth-safari_2.0
+    tree -L 1
+    # .
+    # ├── aqua-server/   -> Node/Express Aqua attestation microservice
+    # └── web/           -> Vite + React frontend + Supabase proxy sources
     ```
 
-2.  **Install dependencies:**
-    This project uses `npm` as its package manager.
+2.  **Install dependencies (frontend + attestor):**
     ```bash
-    npm install
+    cd web && npm install
+    cd ../aqua-server && npm install
+    cd ..
     ```
 
 3.  **Set up environment variables:**
-    You will need to create a `.env` file in the root of the project and add your Supabase and Privy credentials.
-    ```
-    VITE_SUPABASE_URL=your-supabase-url
-    VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-    VITE_PRIVY_APP_ID=your-privy-app-id
-    AQUA_SERVICE_URL=https://your-node-attestation-service/attest
-    ```
+    - Create `web/.env` for the Vite app:
+      ```
+      VITE_SUPABASE_URL=your-supabase-url
+      VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+      VITE_PRIVY_APP_ID=your-privy-app-id
+      VITE_SUPABASE_FUNCTIONS_URL=https://<project>.functions.supabase.co
+      ```
+    - Create `aqua-server/.env` for the attestation service:
+      ```
+      PORT=8787
+      AQUA_SERVICE_TOKEN=choose-a-strong-shared-secret
+      SUPABASE_URL=your-supabase-url
+      SUPABASE_SERVICE_ROLE_KEY=service-role-key
+      AQUA_MNEMONIC="seed words for aqua-js-sdk"
+      ```
 
-4.  **Run the development server:**
+4.  **Run the development servers:**
     ```bash
+    # Terminal 1 - frontend
+    cd web
     npm run dev
+    # -> http://localhost:5173
+
+    # Terminal 2 - Aqua Node service
+    cd aqua-server
+    npm run dev   # or node index.js
     ```
-    The application will be available at `http://localhost:5173` (or another port if 5173 is in use).
 
 ## 🛠️ Tech Stack
 
 -   **Frontend:** React, TypeScript, Vite, Tailwind CSS
 -   **Backend:** Supabase (for database and serverless functions)
 -   **Authentication:** Privy
--   **Decentralized Trust:** Aqua Protocol (Node attestation microservice)
+-   **Decentralized Trust:** Aqua Protocol (Node attestation microservice in `aqua-server/`)

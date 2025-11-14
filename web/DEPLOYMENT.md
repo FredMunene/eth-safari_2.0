@@ -7,18 +7,28 @@
 - Git, pnpm/nvm optional but ensure `npm install` is available.  
 
 ## 2. Environment Variables
-Create `.env` (or configure your host) with the following vars:  
+There are now three env scopes to configure:  
 
-- `VITE_SUPABASE_URL` — Supabase project REST endpoint. Example: `https://<project-id>.supabase.co`.  
-- `VITE_SUPABASE_SUPABASE_ANON_KEY` — anon service key copied from Supabase dashboard → Project Settings → API. (The double `SUPABASE` prefix is intentional to match existing imports in `src/lib/supabase.ts`.)  
-- `VITE_PRIVY_APP_ID` — Privy application ID for the React SDK.  
-- `VITE_SUPABASE_FUNCTIONS_URL` — Base URL for Supabase Edge Functions (e.g., `https://<project>.functions.supabase.co`).  
-- `PRIVY_APP_SECRET` — used by the ops proxy to validate Privy access tokens.  
-- `SUPABASE_SERVICE_ROLE_KEY` (proxy only) — grants the proxy insert/update access when running via Supabase Edge Functions.  
-- `AQUA_SERVICE_URL` — URL of the Node-based attestation microservice (`https://<attest-domain>/api/attest`).  
-- `AQUA_SERVICE_TOKEN` — shared secret header the Node service expects from the proxy.  
+1. **`web/.env` (Vite frontend)**  
+   - `VITE_SUPABASE_URL` — Supabase project REST endpoint. Example: `https://<project-id>.supabase.co`.  
+   - `VITE_SUPABASE_SUPABASE_ANON_KEY` — anon service key copied from Supabase dashboard → Project Settings → API. (The double `SUPABASE` prefix is intentional to match existing imports in `src/lib/supabase.ts`.)  
+   - `VITE_PRIVY_APP_ID` — Privy application ID for the React SDK.  
+   - `VITE_SUPABASE_FUNCTIONS_URL` — Base URL for Supabase Edge Functions (e.g., `https://<project>.functions.supabase.co`).  
 
-Restart the dev server whenever these values change; Vite only injects `import.meta.env` at build/start.  
+2. **Supabase function secrets (`supabase secrets set …`)**  
+   - `PROJECT_URL`/`SERVICE_ROLE_KEY` (aliases for `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`).  
+   - `PRIVY_APP_ID`, `PRIVY_APP_SECRET`.  
+   - `AQUA_SERVICE_URL` — URL of the Node-based attestation microservice (`https://<attest-domain>/api/attest`).  
+   - `AQUA_SERVICE_TOKEN` — shared secret header the Node service expects from the proxy.  
+   - `AQUA_ENABLED` — optional flag to toggle the local SDK fallback.  
+
+3. **`aqua-server/.env` (Node attestation service)**  
+   - `PORT` — local listening port (defaults to 8787).  
+   - `AQUA_SERVICE_TOKEN` — must match the shared secret above.  
+   - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — required if the service writes hashes back to Supabase on its own.  
+   - `AQUA_MNEMONIC` / `AQUA_SEED` — credentials consumed by `aqua-js-sdk` (see [Aqua docs](https://deepwiki.com/inblockio/aqua-js-sdk)).  
+
+Restart the dev servers whenever these values change; Vite only injects `import.meta.env` at build/start.  
 
 > Supabase CLI forbids secrets that begin with `SUPABASE_`. When setting secrets via `supabase secrets set`, use aliases such as `PROJECT_URL` and `SERVICE_ROLE_KEY`; the ops proxy automatically falls back to those names. Example:  
 > ```bash
@@ -34,26 +44,36 @@ Restart the dev server whenever these values change; Vite only injects `import.m
 Not applicable yet. Aqua attestations are handled off-chain through the JS SDK; contract deployments will be documented once on-chain components exist.  
 
 ## 4. Backend / Frontend
-1. Install dependencies:  
+1. Install dependencies (frontend + attestor):  
    ```bash
-   npm install
+   cd web && npm install
+   cd ../aqua-server && npm install
+   cd ..
    ```  
 2. Start local dev server with hot reload:  
    ```bash
+   cd web
    npm run dev
    ```  
 3. Build production assets (outputs to `dist/`):  
    ```bash
+   cd web
    npm run build
    ```  
 4. Preview a production build locally:  
    ```bash
+   cd web
    npm run preview
    ```  
-5. Deploy the `dist/` folder to your static host (Vercel, Netlify, Cloudflare Pages, etc.) and supply the env vars above.  
-6. Deploy the service-role proxy / Supabase Edge Function with `SUPABASE_SERVICE_ROLE_KEY`, `PRIVY_APP_SECRET`, and any Aqua credentials; ensure its endpoint is reachable from the frontend.  
-7. Deploy the **Aqua Node attestation service** (Next.js API route, Express app, etc.). It should accept attestation payloads from the proxy, call `aqua-js-sdk`, and update Supabase (or return the hash). Provide it with the service role key and shared `AQUA_SERVICE_TOKEN`.  
-8. Configure your static host to serve the SPA fallback so `/apply` routes to `index.html`; the participant portal shares the same bundle.  
+5. In parallel, run the Aqua Node service locally for end-to-end tests:  
+   ```bash
+   cd aqua-server
+   npm run dev   # or node index.js / tsx src/index.ts
+   ```  
+6. Deploy the `web/dist/` folder to your static host (Vercel, Netlify, Cloudflare Pages, etc.) and supply the env vars above.  
+7. Deploy the service-role proxy / Supabase Edge Function with `SUPABASE_SERVICE_ROLE_KEY`, `PRIVY_APP_SECRET`, and Aqua service details; ensure its endpoint is reachable from the frontend.  
+8. Deploy the **Aqua Node attestation service** inside `aqua-server/` (Next.js API route, Express app, etc.). It should accept attestation payloads from the proxy, call `aqua-js-sdk`, and update Supabase (or return the hash). Provide it with the service role key and shared `AQUA_SERVICE_TOKEN`.  
+9. Configure your static host to serve the SPA fallback so `/apply` routes to `index.html`; the participant portal shares the same bundle.  
 
 ## 7. Ops Proxy (Supabase Edge Function)
 - Deploy from the repo root once Supabase CLI is linked:  
