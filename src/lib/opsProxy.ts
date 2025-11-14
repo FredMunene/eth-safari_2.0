@@ -1,8 +1,7 @@
 import type { Participant } from './supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
 const DEFAULT_FUNCTIONS_BASE = (() => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   if (!supabaseUrl) return '';
   try {
     const url = new URL(supabaseUrl);
@@ -15,12 +14,12 @@ const DEFAULT_FUNCTIONS_BASE = (() => {
 })();
 
 const functionsBase =
-  process.env.NEXT_PUBLIC_SUPABASE_FUNCTIONS_URL?.replace(/\/$/, '') ||
+  import.meta.env.VITE_SUPABASE_FUNCTIONS_URL?.replace(/\/$/, '') ||
   DEFAULT_FUNCTIONS_BASE;
 
 if (!functionsBase) {
   // eslint-disable-next-line no-console
-  console.warn('Missing Supabase Functions URL; set NEXT_PUBLIC_SUPABASE_FUNCTIONS_URL for proxy calls');
+  console.warn('Missing Supabase Functions URL; set VITE_SUPABASE_FUNCTIONS_URL for proxy calls');
 }
 
 type ParticipantPayload = Pick<Participant, 'name' | 'email' | 'role'> & {

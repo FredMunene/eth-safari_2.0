@@ -1,7 +1,7 @@
 # Runbook
 
 ## 1. System Overview
-- **Ops Hub Web App (Next.js + React):** Provides Ops Lead panel, participant portal, QR scanner, payout console. Reads directly via anon key but routes privileged mutations through the `ops-proxy` Supabase Edge Function using Privy access tokens.  
+- **Ops Hub Web App (Vite + React):** Provides Ops Lead panel, participant portal, QR scanner, payout console. Reads directly via anon key but routes privileged mutations through the `ops-proxy` Supabase Edge Function using Privy access tokens.  
 - **Supabase Postgres:** Hosts tables defined in `supabase/migrations/20251112174406_create_ops_hub_schema.sql` plus RLS policies for participants, travel approvals, check-ins, payouts, and activity log.  
 - **Aqua Attestation Hooks:** Ops proxy now mints Aqua attestations (via `aqua-js-sdk`) for approvals, check-ins, and payouts, writing hashes to the respective tables and flipping `aqua_verified` on activity logs.  
 - **Participant Onboarding Portal:** `/apply` route where invitees authenticate with Privy, fetch their `onboarding_invites` row, and submit travel/stipend details that create pending `travel_approvals`.  
@@ -10,16 +10,16 @@
 
 ### 2.1 Restarting Services
 1. **Frontend:**  
-   - Local/dev: stop the Next.js dev server (Ctrl+C) and rerun `npm run dev`.  
-   - Production (hosted build): redeploy the latest Next.js build (Vercel/Netlify/etc.).  
+   - Local/dev: stop the Vite server (Ctrl+C) and rerun `npm run dev`.  
+   - Production (static host): redeploy the latest `dist/` bundle (Vercel/Netlify redeploy button).  
    - Verify by loading `/` and confirming the Ops Lead metrics render without network errors in DevTools.  
 2. **Supabase Edge Functions / DB:**  
    - Not in use yet. Monitor Supabase dashboard → Database → Status for incidents.  
 
 ### 2.2 Rotating Keys / Secrets
 1. Generate a new Supabase anon key from Project Settings → API.  
-2. Update `NEXT_PUBLIC_SUPABASE_ANON_KEY` wherever the frontend is deployed.  
-3. Restart/redeploy the frontend so `process.env.NEXT_PUBLIC_*` is rebuilt.  
+2. Update `VITE_SUPABASE_SUPABASE_ANON_KEY` wherever the frontend is deployed.  
+3. Restart/redeploy the frontend so `import.meta.env` is rebuilt.  
 4. Smoke test: issue a travel approval in the UI; check browser console for 403/401 errors.  
 
 ### 2.3 Running Database Migrations
@@ -30,7 +30,7 @@
 
 ### 2.4 Rotating Privy Keys / Handling Outages
 1. Visit Privy dashboard → Settings → API Keys; create a new **Client ID** / secret pair.  
-2. Update frontend env vars (`NEXT_PUBLIC_PRIVY_APP_ID`, etc.) and redeploy.  
+2. Update frontend env vars (`VITE_PRIVY_APP_ID`, etc.) and redeploy.  
 3. Update service-role proxy secrets so it can verify Privy tokens (usually `PRIVY_APP_SECRET`).  
 4. Revoke the old key in Privy dashboard once deployments confirm healthy sign-in.  
 5. During Privy outages, switch Ops UI into read-only mode (feature flag) and log the incident in `DEBUG.md`; notify team via status channel.  
@@ -97,7 +97,7 @@
 **Quick Checks:**  
 - Check https://status.privy.io and Privy dashboard alerts.  
 - Inspect browser console for Privy SDK errors (expired app ID, missing domain).  
-- Confirm environment variables (`NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_SECRET`) match the dashboard.  
+- Confirm environment variables (`VITE_PRIVY_APP_ID`, `PRIVY_APP_SECRET`) match the dashboard.  
 
 **Mitigation:**  
 - If outage: toggle Ops UI into read-only mode and queue manual approvals; document impacted users.  

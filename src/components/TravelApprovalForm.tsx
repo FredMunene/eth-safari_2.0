@@ -1,5 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle, X } from 'lucide-react';
 import { usePrivy } from '@privy-io/react-auth';
 import { supabase, type Participant } from '../lib/supabase';
@@ -101,18 +100,18 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
     }
   }
 
-  const generatePreviewQR = useCallback(async () => {
+  async function generatePreviewQR() {
     if (formData.itinerary) {
       const tempToken = crypto.randomUUID();
       const payload = createQRPayload('preview', tempToken);
       const qrCode = await generateQRCode(payload);
       setQrPreview(qrCode);
     }
-  }, [formData.itinerary]);
+  }
 
   useEffect(() => {
     generatePreviewQR();
-  }, [generatePreviewQR]);
+  }, [formData.itinerary]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">

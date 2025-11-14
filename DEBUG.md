@@ -64,7 +64,7 @@
 - Client-side code never fetched Privy access tokens or targeted the Edge Function endpoint.  
 
 **Fix / Change:**  
-- Added `src/lib/opsProxy.ts` helper, new `NEXT_PUBLIC_SUPABASE_FUNCTIONS_URL` env, and updated `TravelApprovalForm` to request an access token via `usePrivy`, call the proxy, and surface meaningful errors.  
+- Added `src/lib/opsProxy.ts` helper, new `VITE_SUPABASE_FUNCTIONS_URL` env, and updated `TravelApprovalForm` to request an access token via `usePrivy`, call the proxy, and surface meaningful errors.  
 - Documented the env var + system overview change in `DEPLOYMENT.md` and `RUNBOOK.md`.  
 
 **Notes / Lessons Learned:**  

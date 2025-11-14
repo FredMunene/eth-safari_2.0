@@ -1,11 +1,9 @@
-'use client';
+import AuthGate from './components/AuthGate';
+import OnboardingPortal from './components/OnboardingPortal';
 
-import AuthGate from '@/components/AuthGate';
-import OnboardingPortal from '@/components/OnboardingPortal';
-
-export default function ApplyPage() {
+export default function OnboardingApp() {
   return (
-    <div className="min-h-screen bg-sand-50 py-10 px-4">
+    <div className="min-h-screen bg-stone-50 py-10 px-4">
       <AuthGate
         badgeText="ETH Safari Participant Portal"
         title="Sign in to manage your submission"

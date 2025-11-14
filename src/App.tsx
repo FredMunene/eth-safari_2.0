@@ -1,16 +1,14 @@
-'use client';
-
 import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { Plus, QrCode, DollarSign, MailPlus } from 'lucide-react';
-import Dashboard from '@/components/Dashboard';
-import TravelApprovalForm from '@/components/TravelApprovalForm';
-import QRScanner from '@/components/QRScanner';
-import PayoutConsole from '@/components/PayoutConsole';
-import ParticipantTimeline from '@/components/ParticipantTimeline';
-import InviteManager from '@/components/InviteManager';
-import AuthGate from '@/components/AuthGate';
-import type { Participant, TravelApproval } from '@/lib/supabase';
+import Dashboard from './components/Dashboard';
+import TravelApprovalForm from './components/TravelApprovalForm';
+import QRScanner from './components/QRScanner';
+import PayoutConsole from './components/PayoutConsole';
+import ParticipantTimeline from './components/ParticipantTimeline';
+import type { Participant, TravelApproval } from './lib/supabase';
+import AuthGate from './components/AuthGate';
+import InviteManager from './components/InviteManager';
 
 type ParticipantRow = Participant & {
   travel_approval?: TravelApproval;
@@ -34,7 +32,7 @@ function AppShell() {
     setShowApprovalForm(false);
     setShowQRScanner(false);
     setShowPayoutConsole(false);
-    setRefreshKey((prev) => prev + 1);
+    setRefreshKey(prev => prev + 1);
   }
 
   const primaryIdentifier =
@@ -42,12 +40,11 @@ function AppShell() {
     user?.email?.address ??
     'Authenticated Operator';
 
-  const secondaryIdentifier =
-    user?.email?.address && user?.wallet?.address
-      ? user.email.address
-      : user?.wallet?.chainType
-        ? `Connected via ${user.wallet.chainType}`
-        : undefined;
+  const secondaryIdentifier = user?.email?.address && user?.wallet?.address
+    ? user.email.address
+    : user?.wallet?.chainType
+      ? `Connected via ${user.wallet.chainType}`
+      : undefined;
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -110,7 +107,7 @@ function AppShell() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Dashboard
           key={refreshKey}
-          onUpdate={() => setRefreshKey((prev) => prev + 1)}
+          onUpdate={() => setRefreshKey(prev => prev + 1)}
           onViewParticipant={setSelectedParticipant}
         />
       </main>
@@ -150,7 +147,7 @@ function AppShell() {
   );
 }
 
-export default function Page() {
+export default function App() {
   return (
     <AuthGate>
       <AppShell />
