@@ -3,7 +3,7 @@
 ## 1. System Overview
 - **Ops Hub Web App (Vite + React):** Provides Ops Lead panel, participant portal, QR scanner, payout console. Reads directly via anon key but routes privileged mutations through the `ops-proxy` Supabase Edge Function using Privy access tokens.  
 - **Supabase Postgres:** Hosts tables defined in `supabase/migrations/20251112174406_create_ops_hub_schema.sql` plus RLS policies for participants, travel approvals, check-ins, payouts, and activity log.  
-- **Aqua Attestation Hooks:** Ops proxy now mints Aqua attestations (via `aqua-js-sdk`) for approvals, check-ins, and payouts, writing hashes to the respective tables and flipping `aqua_verified` on activity logs.  
+- **Aqua Attestation Hooks:** Ops proxy delegates attestation payloads to a Node-based service (`AQUA_SERVICE_URL`) that runs `aqua-js-sdk` and writes hashes back to Supabase.  
 - **Participant Onboarding Portal:** `/apply` route where invitees authenticate with Privy, fetch their `onboarding_invites` row, and submit travel/stipend details that create pending `travel_approvals`.  
 
 ## 2. Routine Procedures
@@ -50,6 +50,11 @@
 2. Create invite via proxy (`create_onboarding_invite` action). Copy the generated token and share it with the participant.  
 3. Participants visit `/apply?token=<token>`, sign in with Privy, and submit their form (proxy action `submit_onboarding`).  
 4. Review submissions as pending travel approvals inside the main dashboard.  
+
+### 2.7 Monitoring the Attestation Service
+1. Configure your Node hosting provider (Vercel/Render/EC2) to expose health metrics for the Aqua attestation service.  
+2. Rotate `AQUA_SERVICE_TOKEN` on both the proxy and Node service if compromise is suspected.  
+3. When the service is down, set `AQUA_ENABLED=false` in the proxy secrets and queue pending attestations so you can replay them later.  
 
 ## 3. Incident Playbooks
 
@@ -161,3 +166,20 @@
 **Follow-Up:**  
 - Document root cause in `DEBUG.md`.  
 - Add tests or validation if specific fields (itinerary, stipend) were causing proxy errors.  
+### 3.7 “Attestation Service Failures”
+**Symptoms:**  
+- Ops proxy responses contain `Failed to call Aqua service` and `aqua_verified` remains false.  
+
+**Quick Checks:**  
+- Check the Node service logs/health endpoint.  
+- Confirm `AQUA_SERVICE_URL` and `AQUA_SERVICE_TOKEN` match between proxy secrets and the Node service config.  
+- Re-run the POST request manually with `curl` to retrieve the precise error.  
+
+**Mitigation:**  
+- Redeploy/restart the Node service.  
+- Temporarily disable attestation in the proxy (`AQUA_ENABLED=false`) and backfill hashes later.  
+- If hash writes partially succeeded, rerun the attestation for affected records via a script or queue.  
+
+**Follow-Up:**  
+- Document the outage in `DEBUG.md`.  
+- Update `THREAT_MODEL.md` if new risks were discovered (e.g., replay attacks on the attestation API).  

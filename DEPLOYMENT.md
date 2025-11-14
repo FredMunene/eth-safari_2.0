@@ -15,7 +15,8 @@ Create `.env` (or configure your host) with the following vars:
 - `VITE_SUPABASE_FUNCTIONS_URL` — Base URL for Supabase Edge Functions (e.g., `https://<project>.functions.supabase.co`).  
 - `PRIVY_APP_SECRET` — used by the ops proxy to validate Privy access tokens.  
 - `SUPABASE_SERVICE_ROLE_KEY` (proxy only) — grants the proxy insert/update access when running via Supabase Edge Functions.  
-- `AQUA_ENABLED` — defaults to `true`; set to `false` to skip Aqua attestation minting inside the ops proxy.  
+- `AQUA_SERVICE_URL` — URL of the Node-based attestation microservice (`https://<attest-domain>/api/attest`).  
+- `AQUA_SERVICE_TOKEN` — shared secret header the Node service expects from the proxy.  
 
 Restart the dev server whenever these values change; Vite only injects `import.meta.env` at build/start.  
 
@@ -49,22 +50,25 @@ Not applicable yet. Aqua attestations are handled off-chain through the JS SDK; 
    ```bash
    npm run preview
    ```  
-5. Deploy the `dist/` folder to your static host (Vercel, Netlify, Cloudflare Pages, etc.) and supply the two env vars above.  
+5. Deploy the `dist/` folder to your static host (Vercel, Netlify, Cloudflare Pages, etc.) and supply the env vars above.  
 6. Deploy the service-role proxy / Supabase Edge Function with `SUPABASE_SERVICE_ROLE_KEY`, `PRIVY_APP_SECRET`, and any Aqua credentials; ensure its endpoint is reachable from the frontend.  
-7. Configure your host to serve the SPA fallback so `/apply` routes to `index.html`; the participant portal shares the same bundle.  
+7. Deploy the **Aqua Node attestation service** (Next.js API route, Express app, etc.). It should accept attestation payloads from the proxy, call `aqua-js-sdk`, and update Supabase (or return the hash). Provide it with the service role key and shared `AQUA_SERVICE_TOKEN`.  
+8. Configure your static host to serve the SPA fallback so `/apply` routes to `index.html`; the participant portal shares the same bundle.  
 
 ## 7. Ops Proxy (Supabase Edge Function)
 - Deploy from the repo root once Supabase CLI is linked:  
   ```bash
   supabase functions deploy ops-proxy --project-ref <ref> --no-verify-jwt
   ```  
-- Provide the secrets required by the function (Supabase URL, service role key, Privy credentials):  
+- Provide the secrets required by the function (Supabase URL, service role key, Privy credentials, attestation service details):  
   ```bash
   supabase secrets set \
     SUPABASE_URL=<https://project.supabase.co> \
     SUPABASE_SERVICE_ROLE_KEY=<service-role> \
     PRIVY_APP_ID=<app-id> \
     PRIVY_APP_SECRET=<app-secret> \
+    AQUA_SERVICE_URL=<https://attest.yourdomain.com/api/attest> \
+    AQUA_SERVICE_TOKEN=<shared-secret> \
     --project-ref <ref>
   ```  
 - Test locally with `supabase functions serve ops-proxy --env-file .env.proxy` so you can hit `http://localhost:54321/functions/v1/ops-proxy`.  

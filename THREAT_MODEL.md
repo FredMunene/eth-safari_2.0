@@ -43,7 +43,7 @@
 - Bind QR payloads to participant wallet/signature and require server verification before accepting.  
 - Store hashed tokens or encrypt at rest; display QR only through authenticated portal.  
 
-**Status:** Mitigated — ops proxy now mints attestations with `aqua-js-sdk` and marks activity logs as verified when hashes are recorded.  
+**Status:** Mitigated — ops proxy now delegates attestation minting to a Node service, and activity logs are marked verified when that service returns hashes.  
 
 ### T-003: Attestation Spoofing
 **Description:**  
@@ -98,6 +98,20 @@
 - Treat tokens as secrets: display them only once after creation, encourage ops to rotate if shared in insecure channels.  
 - Optionally expire tokens after first submission or after a time window.  
 - Monitor invite status changes and log unexpected submissions in `activity_log`.  
+
+**Status:** Open.  
+
+### T-007: Attestation Service Compromise
+**Description:**  
+- The external Node attestation service holds the service-role key and `AQUA_SERVICE_TOKEN`. If compromised, an attacker could forge attestation hashes or tamper with Supabase data.  
+
+**Impact:** High — bogus attestations undermine trust across approvals/check-ins/payouts.  
+**Likelihood:** Medium — depends on hosting posture (e.g., Vercel/Render) and secret hygiene.  
+
+**Mitigation:**  
+- Restrict network access (allow only proxy IPs) and require a strong shared token or mutual TLS.  
+- Log every attestation request and verify hashes server-side; add alarms when the service returns errors.  
+- Rotate `AQUA_SERVICE_TOKEN` regularly and store it in a secrets manager (Vault, AWS Secrets Manager).  
 
 **Status:** Open.  
 

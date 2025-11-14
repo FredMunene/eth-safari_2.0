@@ -16,7 +16,7 @@ Our Ops Hub addresses these challenges by creating a transparent, verifiable, an
 
 ## 🌊 How We Integrate AQUA Protocol
 
-The core of the Ops Hub's trust and transparency comes from its integration with the **Aqua Protocol**. We use Aqua to create a tamper-proof, verifiable audit trail for all key logistical operations.
+The core of the Ops Hub's trust and transparency comes from its integration with the **Aqua Protocol**. We use Aqua to create a tamper-proof, verifiable audit trail for all key logistical operations. Rather than minting attestations inside the Supabase edge function (which runs on Deno), we now proxy attestation requests to a dedicated **Node.js attestation service**. That Node server runs `aqua-js-sdk` in a Node runtime and writes the resulting hashes back to Supabase.
 
 -   **Verifiable Approvals:** When an organizer approves a travel request, an Aqua attestation is created. This serves as an immutable proof of approval, containing details like the stipend amount and itinerary.
 -   **On-Site Check-Ins:** Participants can be checked into venues using a QR code linked to their approval attestation. Each scan generates a signed "check-in" event, providing a verifiable record of attendance.
@@ -46,6 +46,7 @@ To run the project locally, follow these steps:
     VITE_SUPABASE_URL=your-supabase-url
     VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
     VITE_PRIVY_APP_ID=your-privy-app-id
+    AQUA_SERVICE_URL=https://your-node-attestation-service/attest
     ```
 
 4.  **Run the development server:**
@@ -59,4 +60,4 @@ To run the project locally, follow these steps:
 -   **Frontend:** React, TypeScript, Vite, Tailwind CSS
 -   **Backend:** Supabase (for database and serverless functions)
 -   **Authentication:** Privy
--   **Decentralized Trust:** Aqua Protocol
+-   **Decentralized Trust:** Aqua Protocol (Node attestation microservice)

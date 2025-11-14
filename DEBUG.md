@@ -123,6 +123,23 @@
 - `createGenesisRevision` is synchronous and doesn’t require credentials, making it lightweight enough for every event.  
 - Leave `AQUA_ENABLED=false` escape hatch in case the SDK misbehaves in production.  
 
+## [2025-11-13] Issue-ID: node-attestation-service
+**Context:**  
+- Aqua attestations kept failing in Supabase Edge Functions (Deno) due to pkijs limitations. Moved minting to a standalone Node server.  
+
+**Error / Symptom:**  
+- Supabase proxy logs showed `@privy-io/server-auth cannot be used in a browser environment` and `pkijs setEngine` failures, leading to CORS/500 responses.  
+
+**Root Cause:**  
+- Aqua SDK relies on Node globals not available in Deno; the ops proxy could not mint hashes reliably.  
+
+**Fix / Change:**  
+- Added `AQUA_SERVICE_URL`/`AQUA_SERVICE_TOKEN` env vars, documented deploying a Node service (Next.js API/Express) that runs `aqua-js-sdk`, and updated RUNBOOK/DEPLOYMENT to reflect the new architecture. Proxy now delegates attestation payloads to that service.  
+
+**Notes / Lessons Learned:**  
+- Keep secrets for the attestation service in a real secrets manager; treat it like any other privileged backend.  
+- Consider adding retries/queue so temporary service outages don’t block approvals.  
+
 ## [2025-11-13] Issue-ID: rls-lockdown
 **Context:**  
 - After migrating approvals, check-ins, and payouts to the ops proxy we can finally disable anon inserts/updates.  
