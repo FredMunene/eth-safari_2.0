@@ -1,7 +1,7 @@
 # Deployment Guide
 
 ## 1. Prerequisites
-- Node.js 20.x (matches Vite 7 + React 19 toolchain) and npm 10+.  
+- Node.js 20.x (Next.js 14 + React 18 toolchain) and npm 10+.  
 - Supabase project (hosted) or Supabase CLI `>=1.187` for local development.  
 - Access to the Aqua Protocol test credentials if you intend to mint attestations (not yet wired, but hashes are stored per row).  
 - Git, pnpm/nvm optional but ensure `npm install` is available.  
@@ -9,15 +9,15 @@
 ## 2. Environment Variables
 Create `.env` (or configure your host) with the following vars:  
 
-- `VITE_SUPABASE_URL` — Supabase project REST endpoint. Example: `https://<project-id>.supabase.co`.  
-- `VITE_SUPABASE_SUPABASE_ANON_KEY` — anon service key copied from Supabase dashboard → Project Settings → API. (The double `SUPABASE` prefix is intentional to match existing imports in `src/lib/supabase.ts`.)  
-- `VITE_PRIVY_APP_ID` — Privy application ID for the React SDK.  
-- `VITE_SUPABASE_FUNCTIONS_URL` — Base URL for Supabase Edge Functions (e.g., `https://<project>.functions.supabase.co`).  
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project REST endpoint. Example: `https://<project-id>.supabase.co`.  
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — anon service key copied from Supabase dashboard → Project Settings → API.  
+- `NEXT_PUBLIC_PRIVY_APP_ID` — Privy application ID for the React SDK.  
+- `NEXT_PUBLIC_SUPABASE_FUNCTIONS_URL` — Base URL for Supabase Edge Functions (e.g., `https://<project>.functions.supabase.co`).  
 - `PRIVY_APP_SECRET` — used by the ops proxy to validate Privy access tokens.  
 - `SUPABASE_SERVICE_ROLE_KEY` (proxy only) — grants the proxy insert/update access when running via Supabase Edge Functions.  
 - `AQUA_ENABLED` — defaults to `true`; set to `false` to skip Aqua attestation minting inside the ops proxy.  
 
-Restart the dev server whenever these values change; Vite only injects `import.meta.env` at build/start.  
+Restart the dev server whenever these values change; Next.js only inlines `process.env.NEXT_PUBLIC_*` during build/start.  
 
 > Supabase CLI forbids secrets that begin with `SUPABASE_`. When setting secrets via `supabase secrets set`, use aliases such as `PROJECT_URL` and `SERVICE_ROLE_KEY`; the ops proxy automatically falls back to those names. Example:  
 > ```bash
@@ -41,17 +41,16 @@ Not applicable yet. Aqua attestations are handled off-chain through the JS SDK; 
    ```bash
    npm run dev
    ```  
-3. Build production assets (outputs to `dist/`):  
+3. Build production assets (the script pins `NEXT_DISABLE_SWC_NATIVE_INSTALL=1` and `SWC_BINARY_PATH=node_modules/@next/swc-wasm-nodejs/next-swc.wasm` so the wasm compiler is used on environments that crash with the native binary):  
    ```bash
    npm run build
    ```  
-4. Preview a production build locally:  
+4. Run the production build locally if needed:  
    ```bash
-   npm run preview
+   npm run start
    ```  
-5. Deploy the `dist/` folder to your static host (Vercel, Netlify, Cloudflare Pages, etc.) and supply the two env vars above.  
-6. Deploy the service-role proxy / Supabase Edge Function with `SUPABASE_SERVICE_ROLE_KEY`, `PRIVY_APP_SECRET`, and any Aqua credentials; ensure its endpoint is reachable from the frontend.  
-7. Configure your host to serve the SPA fallback so `/apply` routes to `index.html`; the participant portal shares the same bundle.  
+5. Deploy the `.next/` output via your Next-friendly host (Vercel, Netlify, Cloudflare Pages + adapter) and provide the env vars above.  
+6. Deploy the service-role proxy / Supabase Edge Function with `SERVICE_ROLE_KEY`, `PRIVY_APP_SECRET`, and any Aqua credentials; ensure its endpoint is reachable from the frontend.  
 
 ## 7. Ops Proxy (Supabase Edge Function)
 - Deploy from the repo root once Supabase CLI is linked:  
@@ -61,8 +60,8 @@ Not applicable yet. Aqua attestations are handled off-chain through the JS SDK; 
 - Provide the secrets required by the function (Supabase URL, service role key, Privy credentials):  
   ```bash
   supabase secrets set \
-    SUPABASE_URL=<https://project.supabase.co> \
-    SUPABASE_SERVICE_ROLE_KEY=<service-role> \
+    PROJECT_URL=<https://project.supabase.co> \
+    SERVICE_ROLE_KEY=<service-role> \
     PRIVY_APP_ID=<app-id> \
     PRIVY_APP_SECRET=<app-secret> \
     --project-ref <ref>
@@ -81,6 +80,6 @@ Not applicable yet. Aqua attestations are handled off-chain through the JS SDK; 
 - Apply the onboarding invite schema (`20251113152000_create_onboarding_invites.sql`) to enable the `/apply` participant portal.  
 
 ## 6. Common Deployment Pitfalls
-- **Missing env vars:** The app throws `Missing Supabase environment variables` during start/build if either `VITE_SUPABASE_URL` or `VITE_SUPABASE_SUPABASE_ANON_KEY` is absent. Double-check host-level config.  
+- **Missing env vars:** The app throws `Missing Supabase environment variables` during start/build if either `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` is absent. Double-check host-level config.  
 - **Anon policies:** Current RLS policies allow `anon` to insert/update critical tables for rapid prototyping. When deploying publicly, tighten these policies and document the change in `ADR.md` + `RUNBOOK.md`.  
 - **QR token collisions:** Tokens default to UUIDs generated client-side. If you disable the Web Crypto API in a given environment, fall back to Node polyfills or server-generated tokens to avoid rejected inserts.  

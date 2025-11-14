@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { CheckCircle, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { submitOnboardingRequest } from '../lib/opsProxy';
+import { useSearchParams } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { submitOnboardingRequest } from '@/lib/opsProxy';
 
 type Invite = {
   id: string;
@@ -15,10 +18,10 @@ type Invite = {
   submitted_at?: string | null;
 };
 
-const queryToken = new URLSearchParams(window.location.search).get('token') ?? '';
-
 export default function OnboardingPortal() {
-  const [tokenInput, setTokenInput] = useState(queryToken);
+  const searchParams = useSearchParams();
+  const initialToken = searchParams.get('token') ?? '';
+  const [tokenInput, setTokenInput] = useState(initialToken);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [loadingInvite, setLoadingInvite] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -28,29 +31,7 @@ export default function OnboardingPortal() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { getAccessToken } = usePrivy();
 
-  useEffect(() => {
-    if (queryToken) {
-      fetchInvite(queryToken);
-    }
-  }, []);
-
-  const inviteStatusLabel = useMemo(() => {
-    if (!invite) return null;
-    switch (invite.status) {
-      case 'pending':
-        return 'Awaiting submission';
-      case 'submitted':
-        return 'Form submitted';
-      case 'approved':
-        return 'Approved';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return invite.status;
-    }
-  }, [invite]);
-
-  async function fetchInvite(token: string) {
+  const fetchInvite = useCallback(async (token: string) => {
     try {
       setLoadingInvite(true);
       setInviteError(null);
@@ -78,7 +59,30 @@ export default function OnboardingPortal() {
     } finally {
       setLoadingInvite(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (initialToken) {
+      setTokenInput(initialToken);
+      fetchInvite(initialToken);
+    }
+  }, [initialToken, fetchInvite]);
+
+  const inviteStatusLabel = useMemo(() => {
+    if (!invite) return null;
+    switch (invite.status) {
+      case 'pending':
+        return 'Awaiting submission';
+      case 'submitted':
+        return 'Form submitted';
+      case 'approved':
+        return 'Approved';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return invite.status;
+    }
+  }, [invite]);
 
   async function handleTokenLookup(event: React.FormEvent) {
     event.preventDefault();

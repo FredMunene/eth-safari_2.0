@@ -41,22 +41,23 @@ To run the project locally, follow these steps:
     ```
 
 3.  **Set up environment variables:**
-    You will need to create a `.env` file in the root of the project and add your Supabase and Privy credentials.
+    Create a `.env` file in the root of the project and add your Supabase + Privy credentials:
     ```
-    VITE_SUPABASE_URL=your-supabase-url
-    VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-    VITE_PRIVY_APP_ID=your-privy-app-id
+    NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+    NEXT_PUBLIC_PRIVY_APP_ID=your-privy-app-id
+    NEXT_PUBLIC_SUPABASE_FUNCTIONS_URL=https://<project>.functions.supabase.co
     ```
 
 4.  **Run the development server:**
     ```bash
     npm run dev
     ```
-    The application will be available at `http://localhost:5173` (or another port if 5173 is in use).
+    The application will be available at `http://localhost:3000` (or another port if 3000 is in use).
 
 ## 🛠️ Tech Stack
 
--   **Frontend:** React, TypeScript, Vite, Tailwind CSS
+-   **Frontend:** Next.js (React + TypeScript), Tailwind CSS
 -   **Backend:** Supabase (for database and serverless functions)
 -   **Authentication:** Privy
 -   **Decentralized Trust:** Aqua Protocol

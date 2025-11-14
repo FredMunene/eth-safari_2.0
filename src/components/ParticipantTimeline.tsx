@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { X, CheckCircle, Clock, DollarSign, AlertCircle, Shield } from 'lucide-react';
 import { supabase, type Participant, type TravelApproval } from '../lib/supabase';
 
@@ -21,11 +21,7 @@ export default function ParticipantTimeline({ participant, onClose }: Props) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadTimeline();
-  }, [participant.id]);
-
-  async function loadTimeline() {
+  const loadTimeline = useCallback(async () => {
     try {
       const timelineEvents: TimelineEvent[] = [];
 
@@ -89,7 +85,11 @@ export default function ParticipantTimeline({ participant, onClose }: Props) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [participant.id]);
+
+  useEffect(() => {
+    loadTimeline();
+  }, [loadTimeline]);
 
   function getStatusColor(status: string) {
     switch (status) {
