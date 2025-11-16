@@ -60,7 +60,7 @@ export type ActivityLog = {
   event_type: 'approval' | 'check_in' | 'payout' | 'verification' | 'system';
   participant_id?: string;
   description: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   aqua_verified: boolean;
   created_at: string;
 };

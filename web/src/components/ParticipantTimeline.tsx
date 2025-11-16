@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { X, CheckCircle, Clock, DollarSign, AlertCircle, Shield } from 'lucide-react';
-import { supabase, type Participant, type TravelApproval } from '../lib/supabase';
+import { supabase, type Participant, type TravelApproval, type CheckIn, type Payout } from '../lib/supabase';
+
+type TimelineDetails = TravelApproval | CheckIn | Payout;
 
 type TimelineEvent = {
   id: string;
   type: 'approval' | 'check_in' | 'payout';
   timestamp: string;
   status: string;
-  details: any;
+  details: TimelineDetails;
 };
 
 type Props = {
@@ -21,11 +23,7 @@ export default function ParticipantTimeline({ participant, onClose }: Props) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadTimeline();
-  }, [participant.id]);
-
-  async function loadTimeline() {
+  const loadTimeline = useCallback(async () => {
     try {
       const timelineEvents: TimelineEvent[] = [];
 
@@ -89,7 +87,11 @@ export default function ParticipantTimeline({ participant, onClose }: Props) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [participant.id]);
+
+  useEffect(() => {
+    void loadTimeline();
+  }, [loadTimeline]);
 
   function getStatusColor(status: string) {
     switch (status) {
@@ -143,12 +145,18 @@ export default function ParticipantTimeline({ participant, onClose }: Props) {
 
   function getEventDescription(event: TimelineEvent) {
     switch (event.type) {
-      case 'approval':
-        return `Stipend: $${event.details.stipend_amount} | ${event.details.itinerary}`;
-      case 'check_in':
-        return `Location: ${event.details.location}`;
-      case 'payout':
-        return `Amount: $${event.details.amount} ${event.details.proof_type ? `| ${event.details.proof_type}` : ''}`;
+      case 'approval': {
+        const details = event.details as TravelApproval;
+        return `Stipend: $${details.stipend_amount} | ${details.itinerary}`;
+      }
+      case 'check_in': {
+        const details = event.details as CheckIn;
+        return `Location: ${details.location}`;
+      }
+      case 'payout': {
+        const details = event.details as Payout;
+        return `Amount: $${details.amount} ${details.proof_type ? `| ${details.proof_type}` : ''}`;
+      }
       default:
         return '';
     }

@@ -1,4 +1,5 @@
 import type { Participant } from './supabase';
+import type { AttestationProof } from './attestations';
 
 const DEFAULT_FUNCTIONS_BASE = (() => {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -18,7 +19,6 @@ const functionsBase =
   DEFAULT_FUNCTIONS_BASE;
 
 if (!functionsBase) {
-  // eslint-disable-next-line no-console
   console.warn('Missing Supabase Functions URL; set VITE_SUPABASE_FUNCTIONS_URL for proxy calls');
 }
 
@@ -33,11 +33,13 @@ export type IssueApprovalParams = {
   stipendAmount: number;
   sponsorNotes?: string;
   status: 'pending' | 'approved' | 'rejected';
+  attestation?: AttestationProof;
 };
 
 export type RecordCheckInParams = {
   token: string;
   location?: string;
+  attestation?: AttestationProof;
 };
 
 export type CompletePayoutParams = {
@@ -45,6 +47,7 @@ export type CompletePayoutParams = {
   proofType?: 'receipt' | 'tx_hash' | 'bank_transfer';
   proofData?: string;
   status?: 'pending' | 'processing' | 'completed' | 'failed';
+  attestation?: AttestationProof;
 };
 
 export type CreateInviteParams = {
@@ -58,6 +61,7 @@ export type SubmitOnboardingParams = {
   itinerary: string;
   stipendAmount: number;
   notes?: string;
+  attestation?: AttestationProof;
 };
 
 export async function issueTravelApprovalRequest(accessToken: string, payload: IssueApprovalParams) {
@@ -79,6 +83,7 @@ export async function issueTravelApprovalRequest(accessToken: string, payload: I
         stipendAmount: payload.stipendAmount,
         sponsorNotes: payload.sponsorNotes ?? null,
         status: payload.status,
+        attestation: payload.attestation,
       },
     }),
   });
@@ -146,6 +151,7 @@ export async function submitOnboardingRequest(accessToken: string, payload: Subm
         itinerary: payload.itinerary,
         stipendAmount: payload.stipendAmount,
         notes: payload.notes ?? null,
+        attestation: payload.attestation,
       },
     }),
   });
@@ -180,6 +186,7 @@ export async function recordCheckInRequest(accessToken: string, payload: RecordC
       payload: {
         token: payload.token,
         location: payload.location ?? 'ETH Safari Venue',
+        attestation: payload.attestation,
       },
     }),
   });
@@ -216,6 +223,7 @@ export async function completePayoutRequest(accessToken: string, payload: Comple
         proofType: payload.proofType,
         proofData: payload.proofData,
         status: payload.status ?? 'completed',
+        attestation: payload.attestation,
       },
     }),
   });

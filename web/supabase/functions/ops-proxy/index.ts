@@ -1,7 +1,6 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import { z } from 'https://esm.sh/zod@3.23.8';
-import Aquafier from 'npm:aqua-js-sdk';
 import { importSPKI, jwtVerify } from 'npm:jose@4.15.4';
 
 const supabaseUrl =
@@ -38,12 +37,30 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   },
 });
 
-const aquafier = aquaEnabled ? new Aquafier() : null;
+type AquaGenesisResult = {
+  tag: 'ok' | 'error';
+  data?: Record<string, unknown>;
+  logData?: unknown[];
+};
+
+type AquaSdk = {
+  createGenesisRevision: (fileObject: { fileName: string; fileContent: string; path?: string }) => Promise<AquaGenesisResult>;
+};
+
+let aquafierInstance: AquaSdk | null = null;
+let aquafierInitFailed = false;
 const aquaServiceConfigured = Boolean(aquaServiceUrl && aquaServiceToken);
 let aquaServiceHealthy: boolean | null = aquaServiceConfigured ? false : null;
 let lastAquaServiceError: string | null = null;
 let cachedVerificationKey: CryptoKey | null = null;
 let cachedVerificationKeyRaw: string | null = null;
+
+const attestationSchema = z.object({
+  hash: z.string().min(8),
+  digest: z.string().optional().nullable(),
+  signature: z.string().optional().nullable(),
+  signer: z.string().optional().nullable(),
+});
 
 const issueApprovalSchema = z.object({
   participant: z.object({
@@ -57,6 +74,7 @@ const issueApprovalSchema = z.object({
   stipendAmount: z.number().nonnegative(),
   sponsorNotes: z.string().optional().nullable(),
   status: z.enum(['pending', 'approved', 'rejected']).default('approved'),
+  attestation: attestationSchema.optional(),
 });
 
 type IssueApprovalInput = z.infer<typeof issueApprovalSchema>;
@@ -64,6 +82,7 @@ type IssueApprovalInput = z.infer<typeof issueApprovalSchema>;
 const recordCheckInSchema = z.object({
   token: z.string().min(1),
   location: z.string().min(1).default('ETH Safari Venue'),
+  attestation: attestationSchema.optional(),
 });
 
 type RecordCheckInInput = z.infer<typeof recordCheckInSchema>;
@@ -73,6 +92,7 @@ const completePayoutSchema = z.object({
   proofType: z.enum(['receipt', 'tx_hash', 'bank_transfer']).optional(),
   proofData: z.string().optional().nullable(),
   status: z.enum(['pending', 'processing', 'completed', 'failed']).default('completed'),
+  attestation: attestationSchema.optional(),
 });
 
 type CompletePayoutInput = z.infer<typeof completePayoutSchema>;
@@ -90,6 +110,7 @@ const submitOnboardingSchema = z.object({
   itinerary: z.string().min(1),
   stipendAmount: z.number().nonnegative(),
   notes: z.string().optional().nullable(),
+  attestation: attestationSchema.optional(),
 });
 
 type SubmitOnboardingInput = z.infer<typeof submitOnboardingSchema>;
@@ -119,7 +140,10 @@ type ProxyPayload =
       action: 'health';
     };
 
-type JsonValue = Record<string, unknown>;
+type PrivyClaims = {
+  userId: string;
+  [key: string]: unknown;
+};
 
 async function authenticate(request: Request) {
   const authHeader = request.headers.get('authorization');
@@ -133,7 +157,7 @@ async function authenticate(request: Request) {
   try {
     const claims = await verifyPrivyToken(token);
     return claims;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -175,6 +199,9 @@ async function ensureParticipant(participant: IssueApprovalInput['participant'])
 
 type AttestationResult = {
   hash: string | null;
+  digest?: string | null;
+  signature?: string | null;
+  signer?: string | null;
 };
 
 async function getPrivyVerificationKey() {
@@ -212,7 +239,7 @@ async function verifyPrivyToken(token: string) {
   try {
     const key = await getPrivyVerificationKey();
     const result = await jwtVerify(token, key);
-    return result.payload as Record<string, any>;
+    return result.payload as PrivyClaims;
   } catch (error) {
     console.error('Privy token verification failed', error);
     throw error;
@@ -271,7 +298,34 @@ async function callAquaService(
   }
 }
 
-async function createAquaAttestation(kind: string, payload: Record<string, unknown>): Promise<AttestationResult | null> {
+async function getAquafier(): Promise<AquaSdk | null> {
+  if (!aquaEnabled || aquafierInitFailed) {
+    return null;
+  }
+  if (aquafierInstance) {
+    return aquafierInstance;
+  }
+
+  try {
+    const module = await import('npm:aqua-js-sdk');
+    aquafierInstance = new module.default();
+    return aquafierInstance;
+  } catch (error) {
+    aquafierInitFailed = true;
+    console.error('Failed to initialize Aqua SDK in Edge runtime', error);
+    return null;
+  }
+}
+
+async function createAquaAttestation(
+  kind: string,
+  payload: Record<string, unknown>,
+  provided?: AttestationResult | null,
+): Promise<AttestationResult | null> {
+  if (provided?.hash) {
+    return provided;
+  }
+
   const document = { ...payload, kind, timestamp: new Date().toISOString() };
 
   const serviceResult = await callAquaService(kind, document);
@@ -279,7 +333,12 @@ async function createAquaAttestation(kind: string, payload: Record<string, unkno
     return serviceResult;
   }
 
-  if (!aquaEnabled || !aquafier) {
+  if (!aquaEnabled) {
+    return null;
+  }
+
+  const aquafier = await getAquafier();
+  if (!aquafier) {
     return null;
   }
   try {
@@ -325,13 +384,17 @@ async function issueTravelApproval(payload: IssueApprovalInput, operatorId: stri
     throw new Error(`Failed to create travel approval: ${approvalError?.message ?? 'unknown error'}`);
   }
 
-  const attestation = await createAquaAttestation('travel_approval', {
-    approvalId: approval.id,
-    participantId,
-    stipendAmount: payload.stipendAmount,
-    status: payload.status,
-    operator_privy_user: operatorId,
-  });
+  const attestation = await createAquaAttestation(
+    'travel_approval',
+    {
+      approvalId: approval.id,
+      participantId,
+      stipendAmount: payload.stipendAmount,
+      status: payload.status,
+      operator_privy_user: operatorId,
+    },
+    payload.attestation,
+  );
 
   if (attestation?.hash) {
     await supabase
@@ -349,6 +412,8 @@ async function issueTravelApproval(payload: IssueApprovalInput, operatorId: stri
       stipend_amount: payload.stipendAmount,
       operator_privy_user: operatorId,
       aqua_hash: attestation?.hash ?? null,
+      aqua_digest: attestation?.digest ?? null,
+      aqua_signer: attestation?.signer ?? null,
     },
     aqua_verified: Boolean(attestation?.hash),
   });
@@ -385,13 +450,17 @@ async function recordCheckIn(payload: RecordCheckInInput, operatorId: string) {
     throw new Error(insertError.message);
   }
 
-  const attestation = await createAquaAttestation('check_in', {
-    travelApprovalId: approval.id,
-    participantId: approval.participant_id,
-    location: payload.location,
-    operator_privy_user: operatorId,
-    checkInId: checkIn.id,
-  });
+  const attestation = await createAquaAttestation(
+    'check_in',
+    {
+      travelApprovalId: approval.id,
+      participantId: approval.participant_id,
+      location: payload.location,
+      operator_privy_user: operatorId,
+      checkInId: checkIn.id,
+    },
+    payload.attestation,
+  );
 
   if (attestation?.hash) {
     await supabase
@@ -409,6 +478,8 @@ async function recordCheckIn(payload: RecordCheckInInput, operatorId: string) {
       location: payload.location,
       operator_privy_user: operatorId,
       aqua_hash: attestation?.hash ?? null,
+      aqua_digest: attestation?.digest ?? null,
+      aqua_signer: attestation?.signer ?? null,
     },
     aqua_verified: Boolean(attestation?.hash),
   });
@@ -444,13 +515,17 @@ async function completePayout(payload: CompletePayoutInput, operatorId: string) 
     throw new Error(updateError.message);
   }
 
-  const attestation = await createAquaAttestation('payout', {
-    payoutId: payout.id,
-    travelApprovalId: payout.travel_approval_id,
-    amount: payout.amount,
-    status: payload.status,
-    operator_privy_user: operatorId,
-  });
+  const attestation = await createAquaAttestation(
+    'payout',
+    {
+      payoutId: payout.id,
+      travelApprovalId: payout.travel_approval_id,
+      amount: payout.amount,
+      status: payload.status,
+      operator_privy_user: operatorId,
+    },
+    payload.attestation,
+  );
 
   if (attestation?.hash) {
     await supabase
@@ -468,6 +543,8 @@ async function completePayout(payload: CompletePayoutInput, operatorId: string) 
       proof_type: payload.proofType,
       operator_privy_user: operatorId,
       aqua_hash: attestation?.hash ?? null,
+      aqua_digest: attestation?.digest ?? null,
+      aqua_signer: attestation?.signer ?? null,
     },
     aqua_verified: Boolean(attestation?.hash),
   });
@@ -546,13 +623,17 @@ async function submitOnboarding(payload: SubmitOnboardingInput, operatorId: stri
     throw new Error(`Failed to create travel approval: ${approvalError?.message ?? 'unknown error'}`);
   }
 
-  const attestation = await createAquaAttestation('onboarding_submission', {
-    approvalId: approval.id,
-    participantId,
-    itinerary: payload.itinerary,
-    stipendAmount: payload.stipendAmount,
-    operator_privy_user: operatorId,
-  });
+  const attestation = await createAquaAttestation(
+    'onboarding_submission',
+    {
+      approvalId: approval.id,
+      participantId,
+      itinerary: payload.itinerary,
+      stipendAmount: payload.stipendAmount,
+      operator_privy_user: operatorId,
+    },
+    payload.attestation,
+  );
 
   if (attestation?.hash) {
     await supabase
@@ -585,6 +666,8 @@ async function submitOnboarding(payload: SubmitOnboardingInput, operatorId: stri
       approval_id: approval.id,
       operator_privy_user: operatorId,
       aqua_hash: attestation?.hash ?? null,
+      aqua_digest: attestation?.digest ?? null,
+      aqua_signer: attestation?.signer ?? null,
     },
     aqua_verified: Boolean(attestation?.hash),
   });

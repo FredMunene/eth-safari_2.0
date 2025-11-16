@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { submitOnboardingRequest } from '../lib/opsProxy';
+import { createBrowserAttestation } from '../lib/attestations';
 
 type Invite = {
   id: string;
@@ -11,7 +12,7 @@ type Invite = {
   role: string;
   token: string;
   status: 'pending' | 'submitted' | 'approved' | 'cancelled';
-  form_data?: Record<string, any>;
+  form_data?: Record<string, unknown>;
   submitted_at?: string | null;
 };
 
@@ -26,7 +27,8 @@ export default function OnboardingPortal() {
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const { getAccessToken } = usePrivy();
+  const { getAccessToken, user } = usePrivy();
+  const { wallets } = useWallets();
 
   useEffect(() => {
     if (queryToken) {
@@ -107,11 +109,28 @@ export default function OnboardingPortal() {
         throw new Error('Unable to fetch Privy access token. Please re-authenticate.');
       }
 
+      const wallet = wallets[0];
+      if (!wallet) {
+        throw new Error('Connect or create a wallet in Privy before submitting.');
+      }
+
+      const attestationPayload = {
+        token: invite.token,
+        itinerary: formState.itinerary,
+        stipendAmount,
+        notes: formState.notes || null,
+        participant_email: invite.email,
+        operator_privy_user: user?.id ?? null,
+      };
+
+      const attestation = await createBrowserAttestation('onboarding_submission', attestationPayload, wallet);
+
       await submitOnboardingRequest(accessToken, {
         token: invite.token,
         itinerary: formState.itinerary,
         stipendAmount,
         notes: formState.notes || undefined,
+        attestation,
       });
 
       setSubmitSuccess(true);

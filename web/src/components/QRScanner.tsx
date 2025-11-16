@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import { Camera, X, CheckCircle, AlertCircle } from 'lucide-react';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { recordCheckInRequest } from '../lib/opsProxy';
+import { createBrowserAttestation } from '../lib/attestations';
 
 type Props = {
   onClose: () => void;
@@ -25,7 +26,8 @@ export default function QRScanner({ onClose, onSuccess }: Props) {
   const [manualToken, setManualToken] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
-  const { getAccessToken } = usePrivy();
+  const { getAccessToken, user } = usePrivy();
+  const { wallets } = useWallets();
 
   useEffect(() => {
     checkCamera();
@@ -105,9 +107,24 @@ export default function QRScanner({ onClose, onSuccess }: Props) {
         throw new Error('Unable to fetch Privy access token. Please re-authenticate.');
       }
 
+      const wallet = wallets[0];
+      if (!wallet) {
+        throw new Error('Connect a wallet before recording check-ins.');
+      }
+
+      const location = 'ETH Safari Venue';
+      const attestationPayload = {
+        token: payload.token,
+        location,
+        operator_privy_user: user?.id ?? null,
+      };
+
+      const attestation = await createBrowserAttestation('check_in', attestationPayload, wallet);
+
       const data = await recordCheckInRequest(accessToken, {
         token: payload.token,
-        location: 'ETH Safari Venue',
+        location,
+        attestation,
       });
 
       setResult({

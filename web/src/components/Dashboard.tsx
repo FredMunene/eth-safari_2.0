@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Users, CheckCircle, DollarSign } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, type Participant, type TravelApproval, type CheckIn, type Payout } from '../lib/supabase';
 import ParticipantsTable from './ParticipantsTable';
 import ActivityFeed from './ActivityFeed';
 
@@ -10,16 +10,10 @@ type Metrics = {
   payoutsPending: number;
 };
 
-type ParticipantRow = {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  photo_url?: string;
-  created_at: string;
-  travel_approval?: any;
-  latest_check_in?: any;
-  payout?: any;
+type ParticipantRow = Participant & {
+  travel_approval?: TravelApproval;
+  latest_check_in?: CheckIn;
+  payout?: Payout;
 };
 
 type Props = {

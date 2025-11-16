@@ -80,8 +80,9 @@ app.post('/attest', async (req: Request, res: Response) => {
         kind,
         timestamp: new Date().toISOString(),
       }),
+      path: '/',
     };
-    const result = await aquafier.createGenesisRevision(fileObject);
+    const result = (await aquafier.createGenesisRevision(fileObject)) as Record<string, any>;
     const hash =
       result?.data?.aquaTree?.tree?.hash ??
       result?.data?.aquaTree?.treeMapping?.latestHash ??

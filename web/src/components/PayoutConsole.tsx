@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { DollarSign, CheckCircle, X, AlertCircle } from 'lucide-react';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { supabase, type Payout, type TravelApproval, type Participant } from '../lib/supabase';
 import { completePayoutRequest } from '../lib/opsProxy';
+import { createBrowserAttestation } from '../lib/attestations';
+
+type ProofType = 'receipt' | 'tx_hash' | 'bank_transfer';
 
 type PayoutWithDetails = Payout & {
   travel_approval?: TravelApproval & {
@@ -19,10 +22,11 @@ export default function PayoutConsole({ onClose, onSuccess }: Props) {
   const [payouts, setPayouts] = useState<PayoutWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPayout, setSelectedPayout] = useState<PayoutWithDetails | null>(null);
-  const [proofType, setProofType] = useState<'receipt' | 'tx_hash' | 'bank_transfer'>('tx_hash');
+  const [proofType, setProofType] = useState<ProofType>('tx_hash');
   const [proofData, setProofData] = useState('');
   const [processing, setProcessing] = useState(false);
-  const { getAccessToken } = usePrivy();
+  const { getAccessToken, user } = usePrivy();
+  const { wallets } = useWallets();
 
   useEffect(() => {
     loadPayouts();
@@ -74,11 +78,27 @@ export default function PayoutConsole({ onClose, onSuccess }: Props) {
         throw new Error('Unable to fetch Privy access token. Please re-authenticate.');
       }
 
+      const wallet = wallets[0];
+      if (!wallet) {
+        throw new Error('Connect a wallet before marking payouts as paid.');
+      }
+
+      const attestationPayload = {
+        payoutId: selectedPayout.id,
+        amount: selectedPayout.amount,
+        proofType,
+        proofData,
+        operator_privy_user: user?.id ?? null,
+      };
+
+      const attestation = await createBrowserAttestation('payout', attestationPayload, wallet);
+
       await completePayoutRequest(accessToken, {
         payoutId: selectedPayout.id,
         proofType,
         proofData,
         status: 'completed',
+        attestation,
       });
 
       setSelectedPayout(null);
@@ -160,7 +180,10 @@ export default function PayoutConsole({ onClose, onSuccess }: Props) {
                   </label>
                   <select
                     value={proofType}
-                    onChange={(e) => setProofType(e.target.value as any)}
+                    onChange={(e) => {
+                      const next = e.target.value as ProofType;
+                      setProofType(next);
+                    }}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="tx_hash">Transaction Hash</option>

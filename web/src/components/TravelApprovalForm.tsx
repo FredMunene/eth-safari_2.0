@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, X } from 'lucide-react';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { supabase, type Participant } from '../lib/supabase';
 import { generateQRCode, createQRPayload } from '../lib/qr';
 import { issueTravelApprovalRequest, type IssueApprovalParams } from '../lib/opsProxy';
+import { createBrowserAttestation } from '../lib/attestations';
 
 type Props = {
   onClose: () => void;
@@ -25,7 +26,8 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
     sponsorNotes: '',
     isNewParticipant: true,
   });
-  const { getAccessToken } = usePrivy();
+  const { getAccessToken, user } = usePrivy();
+  const { wallets } = useWallets();
 
   useEffect(() => {
     loadParticipants();
@@ -50,6 +52,11 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
       if (!accessToken) {
         throw new Error('Unable to fetch Privy access token. Please re-authenticate.');
       }
+
+       const wallet = wallets[0];
+       if (!wallet) {
+         throw new Error('Connect a wallet before issuing an approval.');
+       }
 
       const stipendAmount = parseFloat(formData.stipendAmount);
       if (Number.isNaN(stipendAmount)) {
@@ -79,12 +86,23 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
         };
       }
 
+      const attestationPayload = {
+        participant: participantPayload,
+        itinerary: formData.itinerary,
+        stipendAmount,
+        sponsorNotes: formData.sponsorNotes || null,
+        operator_privy_user: user?.id ?? null,
+      };
+
+      const attestation = await createBrowserAttestation('travel_approval', attestationPayload, wallet);
+
       await issueTravelApprovalRequest(accessToken, {
         participant: participantPayload,
         itinerary: formData.itinerary,
         stipendAmount,
         sponsorNotes: formData.sponsorNotes || undefined,
         status: 'approved',
+        attestation,
       });
 
       onSuccess();
@@ -100,17 +118,20 @@ export default function TravelApprovalForm({ onClose, onSuccess }: Props) {
     }
   }
 
-  async function generatePreviewQR() {
-    if (formData.itinerary) {
+  useEffect(() => {
+    async function generatePreviewQR() {
+      if (!formData.itinerary) {
+        setQrPreview(null);
+        return;
+      }
+
       const tempToken = crypto.randomUUID();
       const payload = createQRPayload('preview', tempToken);
       const qrCode = await generateQRCode(payload);
       setQrPreview(qrCode);
     }
-  }
 
-  useEffect(() => {
-    generatePreviewQR();
+    void generatePreviewQR();
   }, [formData.itinerary]);
 
   return (
