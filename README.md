@@ -3,7 +3,8 @@
 
 ## Demo
 
-[Watch demo](https://youtu.be/ExB94irX7-o)
+[![Watch the demo](https://img.youtube.com/vi/ExB94irX7-o/hqdefault.jpg)](https://youtu.be/ExB94irX7-o)
+
 
 Web-based operations hub for the ETH Safari hackathon. It lets organizers issue travel approvals, scan on-site check-ins, track stipend payouts, and give participants a self-serve onboarding portal. Every critical action can be anchored to Aqua Protocol attestations for verifiable audit trails.
 
