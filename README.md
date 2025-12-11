@@ -1,12 +1,9 @@
 # ETH Safari 2025 Ops Hub
 
+
 ## Demo
-<iframe width="560" height="315"
-  src="https://www.youtube.com/embed/ExB94irX7-o?si=QmCd5XJWKRjUYTeq"
-  title="YouTube video player" frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-  referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
-</iframe>
+
+[Watch demo](https://youtu.be/ExB94irX7-o)
 
 Web-based operations hub for the ETH Safari hackathon. It lets organizers issue travel approvals, scan on-site check-ins, track stipend payouts, and give participants a self-serve onboarding portal. Every critical action can be anchored to Aqua Protocol attestations for verifiable audit trails.
 
